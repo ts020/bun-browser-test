@@ -20,10 +20,11 @@ test("counter", async () => {
 ```
 
 > [!NOTE]
-> **We hope this package becomes unnecessary.**
-> bun-webview-test exists only because `bun test` has no browser mode yet. The goal is for Bun itself to support
-> browser testing natively, at which point this package should be retired. If Bun ships something equivalent,
-> please use that instead, and if you would like to see it happen, let the Bun team know.
+> **This is an unofficial, community package. It is not affiliated with Bun or Oven.**
+> bun-webview-test exists only because `bun test` has no browser mode yet, and the hope is that Bun itself will
+> support browser testing natively so that this package can be retired. If Bun ships something equivalent, please use
+> that instead. Requests for a browser mode in Bun belong in [Bun's issue tracker](https://github.com/oven-sh/bun/issues),
+> not here; the author of this package is not on the Bun team and cannot act on them.
 
 > [!WARNING]
 > `Bun.WebView` is experimental as of Bun 1.3.14, and so is this package. Expect breaking changes before 1.0.
