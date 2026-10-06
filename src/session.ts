@@ -23,11 +23,11 @@ export class BrowserSession {
   }
 
   static async start(config = getConfig()): Promise<BrowserSession> {
-    const server = await AssetServer.start(config.publicDir);
     const backend =
       config.backend === "webkit"
         ? ("webkit" as const)
         : await chromeBackend(config.chromePath, config.chromeArgs);
+    const server = await AssetServer.start(config.publicDir);
     const view = new Bun.WebView({
       backend,
       width: config.width,

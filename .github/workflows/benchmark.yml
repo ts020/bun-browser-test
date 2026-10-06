@@ -1,0 +1,78 @@
+name: Browser benchmark
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'test/browser/**'
+      - 'bench/vitest-browser/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'bunfig.toml'
+      - '.github/workflows/benchmark.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/browser/**'
+      - 'bench/vitest-browser/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'bunfig.toml'
+      - '.github/workflows/benchmark.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-benchmark-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BWT_BROWSERS_PATH: ${{ github.workspace }}/.cache/bun-webview-test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: bun install --frozen-lockfile
+      - name: Allow Chrome sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install pinned Chrome Headless Shell
+        run: bun src/cli.ts install
+      - name: Compare bun-webview-test and Vitest
+        shell: bash
+        run: |
+          shell_path="$(bun -e 'import { installedHeadlessShell } from "./src/browser-binary"; const path = installedHeadlessShell(); if (!path) throw new Error("Headless Shell missing"); console.log(path);')"
+          python3 bench/vitest-browser/scaling.py --chrome-shell "$shell_path" --groups 20 --workers 2 --runs 3
+      - name: Publish benchmark summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f bench/vitest-browser/.scaling/summary.md ]; then
+            cat bench/vitest-browser/.scaling/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Benchmark did not complete. See the job log and benchmark-results artifact.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            bench/vitest-browser/.scaling/*.json
+            bench/vitest-browser/.scaling/*.md
+            bench/vitest-browser/.scaling/*.log
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30

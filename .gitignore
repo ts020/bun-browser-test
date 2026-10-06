@@ -3,3 +3,4 @@ node_modules/
 **/__screenshots__/
 .vitest/
 dist/
+bench/vitest-browser/.scaling/

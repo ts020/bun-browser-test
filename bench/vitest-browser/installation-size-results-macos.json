@@ -1,0 +1,548 @@
+{
+  "platform": "macOS arm64",
+  "bun": "1.4.2",
+  "measurement": "Fresh projects; bun install --ignore-scripts; sum regular file st_size under node_modules using os.walk without following symlinks. Excludes browsers, runtimes, package-manager caches and filesystem block overhead. Decimal MB = bytes / 1,000,000. Working package tarball before comparison documentation edits.",
+  "package_tarball_sha256": "f7b4bf9611626a636ac555435fffcb3d4d6731fa4db20ca303fb60a2181fe692",
+  "results": [
+    {
+      "configuration": "bun-webview-test",
+      "manifest": {
+        "name": "installer-consumer",
+        "private": true,
+        "dependencies": {
+          "bun-webview-test": "../browser-installer.tgz"
+        }
+      },
+      "bytes": 47932205,
+      "installed_packages": [
+        {
+          "name": "@babel/code-frame",
+          "version": "7.29.7"
+        },
+        {
+          "name": "@babel/helper-validator-identifier",
+          "version": "7.29.7"
+        },
+        {
+          "name": "@babel/runtime",
+          "version": "7.29.7"
+        },
+        {
+          "name": "@blazediff/core",
+          "version": "1.10.0"
+        },
+        {
+          "name": "@jridgewell/resolve-uri",
+          "version": "3.1.2"
+        },
+        {
+          "name": "@jridgewell/sourcemap-codec",
+          "version": "1.6.0"
+        },
+        {
+          "name": "@jridgewell/trace-mapping",
+          "version": "0.3.31"
+        },
+        {
+          "name": "@oxc-project/types",
+          "version": "0.152.0"
+        },
+        {
+          "name": "@polka/url",
+          "version": "1.0.0-next.29"
+        },
+        {
+          "name": "@rolldown/binding-darwin-arm64",
+          "version": "1.2.12"
+        },
+        {
+          "name": "@rolldown/pluginutils",
+          "version": "1.0.1"
+        },
+        {
+          "name": "@testing-library/dom",
+          "version": "10.4.2"
+        },
+        {
+          "name": "@testing-library/user-event",
+          "version": "14.6.7"
+        },
+        {
+          "name": "@types/aria-query",
+          "version": "5.0.4"
+        },
+        {
+          "name": "@types/chai",
+          "version": "5.2.3"
+        },
+        {
+          "name": "@types/deep-eql",
+          "version": "4.0.2"
+        },
+        {
+          "name": "@types/estree",
+          "version": "1.0.9"
+        },
+        {
+          "name": "@types/node",
+          "version": "26.6.4"
+        },
+        {
+          "name": "@vitest/browser",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/mocker",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/pretty-format",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/spy",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/ui",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/utils",
+          "version": "5.0.3"
+        },
+        {
+          "name": "ansi-regex",
+          "version": "5.0.1"
+        },
+        {
+          "name": "ansi-styles",
+          "version": "5.2.0"
+        },
+        {
+          "name": "aria-query",
+          "version": "5.3.0"
+        },
+        {
+          "name": "assertion-error",
+          "version": "2.0.1"
+        },
+        {
+          "name": "bun-types",
+          "version": "1.4.2"
+        },
+        {
+          "name": "bun-webview-test",
+          "version": "0.1.0"
+        },
+        {
+          "name": "chai",
+          "version": "6.3.0"
+        },
+        {
+          "name": "convert-source-map",
+          "version": "2.0.0"
+        },
+        {
+          "name": "dequal",
+          "version": "2.0.3"
+        },
+        {
+          "name": "detect-libc",
+          "version": "2.1.2"
+        },
+        {
+          "name": "dom-accessibility-api",
+          "version": "0.5.16"
+        },
+        {
+          "name": "es-module-lexer",
+          "version": "2.3.2"
+        },
+        {
+          "name": "estree-walker",
+          "version": "3.0.3"
+        },
+        {
+          "name": "expect-type",
+          "version": "1.4.0"
+        },
+        {
+          "name": "fdir",
+          "version": "6.5.0"
+        },
+        {
+          "name": "fflate",
+          "version": "0.8.3"
+        },
+        {
+          "name": "flatted",
+          "version": "3.4.4"
+        },
+        {
+          "name": "fsevents",
+          "version": "2.3.3"
+        },
+        {
+          "name": "ivya",
+          "version": "1.8.2"
+        },
+        {
+          "name": "js-tokens",
+          "version": "4.0.0"
+        },
+        {
+          "name": "lightningcss",
+          "version": "1.33.0"
+        },
+        {
+          "name": "lightningcss-darwin-arm64",
+          "version": "1.33.0"
+        },
+        {
+          "name": "lz-string",
+          "version": "1.5.0"
+        },
+        {
+          "name": "magic-string",
+          "version": "1.4.3"
+        },
+        {
+          "name": "mrmime",
+          "version": "2.0.1"
+        },
+        {
+          "name": "nanoid",
+          "version": "3.3.20"
+        },
+        {
+          "name": "obug",
+          "version": "2.2.1"
+        },
+        {
+          "name": "pathe",
+          "version": "2.0.3"
+        },
+        {
+          "name": "picocolors",
+          "version": "1.1.1"
+        },
+        {
+          "name": "picomatch",
+          "version": "4.0.7"
+        },
+        {
+          "name": "pngjs",
+          "version": "7.0.0"
+        },
+        {
+          "name": "postcss",
+          "version": "8.5.29"
+        },
+        {
+          "name": "pretty-format",
+          "version": "27.5.1"
+        },
+        {
+          "name": "react-is",
+          "version": "17.0.2"
+        },
+        {
+          "name": "rolldown",
+          "version": "1.2.12"
+        },
+        {
+          "name": "sirv",
+          "version": "3.0.2"
+        },
+        {
+          "name": "source-map-js",
+          "version": "1.2.2"
+        },
+        {
+          "name": "std-env",
+          "version": "4.3.0"
+        },
+        {
+          "name": "tinybench",
+          "version": "6.2.1"
+        },
+        {
+          "name": "tinyexec",
+          "version": "1.3.1"
+        },
+        {
+          "name": "tinyglobby",
+          "version": "0.2.17"
+        },
+        {
+          "name": "tinyrainbow",
+          "version": "3.2.0"
+        },
+        {
+          "name": "totalist",
+          "version": "3.0.1"
+        },
+        {
+          "name": "undici-types",
+          "version": "8.9.0"
+        },
+        {
+          "name": "vite",
+          "version": "8.3.3"
+        },
+        {
+          "name": "vitest",
+          "version": "5.0.3"
+        },
+        {
+          "name": "why-is-node-running",
+          "version": "3.2.1"
+        },
+        {
+          "name": "ws",
+          "version": "8.22.0"
+        }
+      ]
+    },
+    {
+      "configuration": "vitest-playwright",
+      "manifest": {
+        "private": true,
+        "type": "module",
+        "devDependencies": {
+          "vitest": "5.0.3",
+          "@vitest/browser-playwright": "5.0.3",
+          "playwright": "1.56.1"
+        }
+      },
+      "bytes": 50005997,
+      "installed_packages": [
+        {
+          "name": "@blazediff/core",
+          "version": "1.10.0"
+        },
+        {
+          "name": "@jridgewell/resolve-uri",
+          "version": "3.1.2"
+        },
+        {
+          "name": "@jridgewell/sourcemap-codec",
+          "version": "1.6.0"
+        },
+        {
+          "name": "@jridgewell/trace-mapping",
+          "version": "0.3.31"
+        },
+        {
+          "name": "@oxc-project/types",
+          "version": "0.152.0"
+        },
+        {
+          "name": "@polka/url",
+          "version": "1.0.0-next.29"
+        },
+        {
+          "name": "@rolldown/binding-darwin-arm64",
+          "version": "1.2.12"
+        },
+        {
+          "name": "@rolldown/pluginutils",
+          "version": "1.0.1"
+        },
+        {
+          "name": "@types/chai",
+          "version": "5.2.3"
+        },
+        {
+          "name": "@types/deep-eql",
+          "version": "4.0.2"
+        },
+        {
+          "name": "@types/estree",
+          "version": "1.0.9"
+        },
+        {
+          "name": "@vitest/browser",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/browser-playwright",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/mocker",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/pretty-format",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/spy",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/ui",
+          "version": "5.0.3"
+        },
+        {
+          "name": "@vitest/utils",
+          "version": "5.0.3"
+        },
+        {
+          "name": "assertion-error",
+          "version": "2.0.1"
+        },
+        {
+          "name": "chai",
+          "version": "6.3.0"
+        },
+        {
+          "name": "convert-source-map",
+          "version": "2.0.0"
+        },
+        {
+          "name": "detect-libc",
+          "version": "2.1.2"
+        },
+        {
+          "name": "es-module-lexer",
+          "version": "2.3.2"
+        },
+        {
+          "name": "estree-walker",
+          "version": "3.0.3"
+        },
+        {
+          "name": "expect-type",
+          "version": "1.4.0"
+        },
+        {
+          "name": "fdir",
+          "version": "6.5.0"
+        },
+        {
+          "name": "fflate",
+          "version": "0.8.3"
+        },
+        {
+          "name": "flatted",
+          "version": "3.4.4"
+        },
+        {
+          "name": "fsevents",
+          "version": "2.3.2"
+        },
+        {
+          "name": "fsevents",
+          "version": "2.3.3"
+        },
+        {
+          "name": "lightningcss",
+          "version": "1.33.0"
+        },
+        {
+          "name": "lightningcss-darwin-arm64",
+          "version": "1.33.0"
+        },
+        {
+          "name": "magic-string",
+          "version": "1.4.3"
+        },
+        {
+          "name": "mrmime",
+          "version": "2.0.1"
+        },
+        {
+          "name": "nanoid",
+          "version": "3.3.20"
+        },
+        {
+          "name": "obug",
+          "version": "2.2.1"
+        },
+        {
+          "name": "pathe",
+          "version": "2.0.3"
+        },
+        {
+          "name": "picocolors",
+          "version": "1.1.1"
+        },
+        {
+          "name": "picomatch",
+          "version": "4.0.7"
+        },
+        {
+          "name": "playwright",
+          "version": "1.56.1"
+        },
+        {
+          "name": "playwright-core",
+          "version": "1.56.1"
+        },
+        {
+          "name": "pngjs",
+          "version": "7.0.0"
+        },
+        {
+          "name": "postcss",
+          "version": "8.5.29"
+        },
+        {
+          "name": "rolldown",
+          "version": "1.2.12"
+        },
+        {
+          "name": "sirv",
+          "version": "3.0.2"
+        },
+        {
+          "name": "source-map-js",
+          "version": "1.2.2"
+        },
+        {
+          "name": "std-env",
+          "version": "4.3.0"
+        },
+        {
+          "name": "tinybench",
+          "version": "6.2.1"
+        },
+        {
+          "name": "tinyexec",
+          "version": "1.3.1"
+        },
+        {
+          "name": "tinyglobby",
+          "version": "0.2.17"
+        },
+        {
+          "name": "tinyrainbow",
+          "version": "3.2.0"
+        },
+        {
+          "name": "totalist",
+          "version": "3.0.1"
+        },
+        {
+          "name": "vite",
+          "version": "8.3.3"
+        },
+        {
+          "name": "vitest",
+          "version": "5.0.3"
+        },
+        {
+          "name": "why-is-node-running",
+          "version": "3.2.1"
+        },
+        {
+          "name": "ws",
+          "version": "8.22.0"
+        }
+      ]
+    }
+  ]
+}

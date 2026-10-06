@@ -105,6 +105,11 @@ export class Input {
     private readonly backend: "chrome" | "webkit",
   ) {}
 
+  /** 押下中の入力やドラッグが残ったタブは、ファイル間で再利用しない。 */
+  get isIdle(): boolean {
+    return !this.pressedKeys.size && !this.buttons.size && !this.dragging && !this.dragListener;
+  }
+
   private cdp(method: string, params: Record<string, unknown>) {
     if (this.backend !== "chrome") {
       throw new Error(`"${method}" needs the chrome backend (Bun.WebView backend: "chrome")`);

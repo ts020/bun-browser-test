@@ -1,4 +1,4 @@
-// Bun 側。テストファイルごとに Bun.WebView を 1 枚開いてページ内でテストを実行し、
+// Bun 側。テストファイルごとに新しい document でテストを実行し、
 // 結果を bun test の describe / test として報告する。
 
 import { afterAll, describe, test } from "bun:test";
@@ -23,6 +23,9 @@ const sessions = new Map<string, FileSession>();
 let server: ReturnType<typeof Bun.serve> | null = null;
 let seq = 0;
 const DEBUG = !!process.env.BWT_DEBUG;
+// --no-isolate ではワーカー内で Chrome のタブを再利用する。document は毎回読み直す。
+let idleChrome: { key: string; view: WebView } | undefined;
+process.on("exit", () => idleChrome?.view.close());
 
 function getServer() {
   server ??= Bun.serve({
@@ -70,13 +73,14 @@ async function route(req: Request): Promise<Response> {
   if (pageMatch) {
     const session = sessions.get(pageMatch[2]!);
     if (!session) return new Response("not found", { status: 404 });
-    const body = pageMatch[1] === "page" ? session.orchestratorHtml() : session.html();
+    const body = pageMatch[1] === "page" ? session.orchestratorHtml(!url.searchParams.has("idle")) : session.html();
     return new Response(body, { headers: { "content-type": "text/html;charset=utf-8" } });
   }
   if (pathname.startsWith("/__bwt/rt/")) {
     const rt = await buildRuntime();
     const out = rt.get(pathname);
-    if (out) return new Response(out.body, { headers: { "content-type": out.type } });
+    // このサーバーの生存中は不変。テストやユーザーのソースにはこのキャッシュを適用しない。
+    if (out) return new Response(out.body, { headers: { "content-type": out.type, "cache-control": "public, max-age=31536000, immutable" } });
   }
   if (pathname === "/favicon.ico") return new Response(null, { status: 204 });
   if (pathname === "/__bwt/resolve") {
@@ -269,11 +273,13 @@ class FileSession {
   readonly unhandled: SerializedError[] = [];
   private cdpListening = new Set<string>();
   private testerHtml: string | null = null;
+  private chromeKey = "";
+  private reusable = true;
 
   constructor(readonly filepath: string) {
     this.config = getBrowserModeConfig();
     const env = process.env.BWT_BACKEND;
-    this.backend = env === "webkit" || env === "chrome" ? env : process.platform === "darwin" && !process.env.BUN_CHROME_PATH ? "webkit" : "chrome";
+    this.backend = env === "webkit" ? "webkit" : "chrome";
   }
 
   get browserName() {
@@ -284,7 +290,7 @@ class FileSession {
    * vitest のオーケストレーターに相当するページ。テストは vitest と同じく iframe（ビューポートの大きさ）の中で動く。
    * Bun 側からの evaluate はこのページで動くので、テスター側のグローバルを転送しておく。
    */
-  orchestratorHtml(): string {
+  orchestratorHtml(tester = true): string {
     const { width, height } = this.config.viewport;
     return `<!doctype html>
 <html>
@@ -298,11 +304,10 @@ iframe { display: block; border: none; background-color: #fff; width: var(--view
 </style>
 </head>
 <body>
-<iframe id="vitest-tester" data-vitest="true" loading="eager" src="/__bwt/tester/${this.id}"></iframe>
+${tester ? `<iframe id="vitest-tester" data-vitest="true" loading="eager" src="/__bwt/tester/${this.id}"></iframe>` : ""}
 <script>
-const iframe = document.getElementById("vitest-tester");
 for (const name of ["__bwt_tester__", "__vitest_browser_runner__", "__bwt_early_errors__"]) {
-  Object.defineProperty(window, name, { get: () => iframe.contentWindow[name] });
+  Object.defineProperty(window, name, { get: () => document.getElementById("vitest-tester")?.contentWindow[name] });
 }
 </script>
 </body>
@@ -415,25 +420,46 @@ ${scripts}
     await Promise.all([buildRuntime(), this.devServer.prepare([this.filepath, ...this.setupFilePaths(), ...htmlModules])]);
     sessions.set(this.id, this);
 
-    this.view = new Bun.WebView({
-      backend:
-        this.backend === "webkit"
-          ? "webkit"
-          : await chromeBackend(chromePath(), process.getuid?.() === 0 ? ["--no-sandbox"] : []),
+    const backend = this.backend === "webkit" ? "webkit" : await chromeBackend(chromePath(), process.getuid?.() === 0 ? ["--no-sandbox"] : []);
+    this.chromeKey = JSON.stringify([backend, this.config.forwardConsole, this.config.server.headers]);
+    const idle = idleChrome;
+    idleChrome = undefined;
+    const reused = this.backend === "chrome" && idle?.key === this.chromeKey;
+    if (!reused) idle?.view.close();
+    this.view = reused ? idle.view : new Bun.WebView({
+      backend,
       width: this.config.viewport.width,
       height: this.config.viewport.height,
       console: this.config.forwardConsole ? pageConsole : undefined,
     });
-    serializeViewCalls(this.view);
+    if (!reused) serializeViewCalls(this.view);
     this.input = new Input(this.view, this.backend);
     if (this.backend === "chrome") {
-      await this.view.navigate("about:blank");
+      // 初回だけ CDP セッションを作る。再利用時に空白ページへ移る必要はない。
+      if (!reused) await this.view.navigate("about:blank");
       await this.setViewport(this.config.viewport.width, this.config.viewport.height);
       // ウィンドウがフォーカスされていなくても focus / blur イベントが起きるようにする
       await this.view.cdp("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
     }
-    // ページが読み込まれるとテスターが自分でテストを始める
-    await this.view.navigate(`${srv.url.origin}/__bwt/page/${this.id}`);
+    if (reused) {
+      // 前のファイルの終了時に読み直した、新しいオーケストレーターにテスターを入れる。
+      // 次のファイルのために外側の document をもう一度読み直す必要はない。
+      const { width, height } = this.config.viewport;
+      await this.view.evaluate(`(() => {
+        history.replaceState(null, "", "/__bwt/page/${this.id}");
+        document.documentElement.style.setProperty("--viewport-width", "${width}px");
+        document.documentElement.style.setProperty("--viewport-height", "${height}px");
+        const iframe = document.createElement("iframe");
+        iframe.id = "vitest-tester";
+        iframe.dataset.vitest = "true";
+        iframe.src = "/__bwt/tester/${this.id}";
+        document.body.append(iframe);
+        return true;
+      })()`);
+    } else {
+      // ページが読み込まれるとテスターが自分でテストを始める
+      await this.view.navigate(`${srv.url.origin}/__bwt/page/${this.id}`);
+    }
     if (DEBUG) {
       setTimeout(async () => {
         console.error("[bwt debug]", await this.view.evaluate("JSON.stringify({t: typeof __bwt_tester__, e: __bwt_early_errors__})"));
@@ -462,7 +488,23 @@ ${scripts}
     }
   }
 
-  close() {
+  async close(reuse = false) {
+    if (reuse && this.backend === "chrome" && this.reusable && !this.unhandled.length && this.input.isIdle) {
+      try {
+        // テスターのない新しい document へ移り、タイマー・iframe・JS の状態を破棄する。
+        // タブ単位の状態も新規タブと同じに戻す。cookie / localStorage は従来どおり origin 単位。
+        await this.view.navigate(`${getServer().url.origin}/__bwt/page/${this.id}?idle`);
+        await this.view.evaluate('(sessionStorage.clear(), window.name = "", true)');
+        await this.view.cdp("Page.resetNavigationHistory");
+        await this.view.cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: 0, y: 0 });
+        idleChrome?.view.close();
+        idleChrome = { key: this.chromeKey, view: this.view };
+        sessions.delete(this.id);
+        return;
+      } catch {
+        // 閉じられたタブや後始末できないタブは再利用しない。
+      }
+    }
     sessions.delete(this.id);
     try {
       this.view?.close();
@@ -509,6 +551,7 @@ ${scripts}
         await this.setViewport(args[0], args[1]);
         return;
       case "cdp": {
+        this.reusable = false;
         const result = await this.view.cdp(args[0], args[1] ?? {});
         // ページが on() を登録するより先にイベントが来ても取りこぼさないよう、enable したドメインのイベントは全部流す
         const domain = /^(\w+)\.enable$/.exec(args[0])?.[1];
@@ -516,6 +559,7 @@ ${scripts}
         return result;
       }
       case "cdpListen":
+        this.reusable = false;
         this.listenCdp(args[0]);
         return;
       case "fileInfo": {
@@ -721,7 +765,15 @@ ${scripts}
     }
     const custom = this.config.commands[name];
     if (!custom) throw new Error(`Command "${name}" is not defined. Pass it to configureBrowserMode({ commands }).`);
-    return custom({ testPath: testPath ?? this.filepath, view: this.view }, ...args);
+    const session = this;
+    return custom({
+      testPath: testPath ?? this.filepath,
+      get view() {
+        // 任意の CDP 設定や初期化スクリプトなどを次のファイルに持ち越さない。
+        session.reusable = false;
+        return session.view;
+      },
+    }, ...args);
   }
 
   // ---- bun test への登録 ----
@@ -837,7 +889,7 @@ export async function runBrowserTestFile(filepath: string): Promise<void> {
       }),
     ]);
   } catch (err) {
-    session.close();
+    await session.close();
     test(basename(filepath), () => {
       throw err;
     });
@@ -856,7 +908,7 @@ export async function runBrowserTestFile(filepath: string): Promise<void> {
   registerTasks(session, file.tasks ?? []);
   afterAll(async () => {
     await Promise.race([session.finished.promise, Bun.sleep(30_000)]);
-    session.close();
+    await session.close(true);
     if (session.unhandled.length) {
       const err = combine(session.unhandled);
       err.message = `Unhandled error(s) in the browser:\n${err.message}`;
