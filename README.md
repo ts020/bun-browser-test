@@ -77,6 +77,11 @@ From here: [rendering things](#rendering-something), [locators](#locators), [`ex
     `BUN_CHROME_PATH` to the executable, or point `PLAYWRIGHT_BROWSERS_PATH` at a Playwright install and its
     Chromium is used.
 
+WKWebView is the macOS default for its low startup cost and zero browser installation; local scaling checks
+with replicated tests also finished sooner than Chrome. It uses the OS's WebKit version and has limitations
+around Tab, hover and touch, plus History and CSS differences. Use `BWT_BACKEND=chrome` when your tests need
+those features or Chromium behavior; see [Backend compatibility](#backend-compatibility).
+
 ## Configuration
 
 The preload adds `expect.element`, resets the page between tests, fails tests on uncaught page errors, and closes the
