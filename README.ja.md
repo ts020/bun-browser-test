@@ -180,9 +180,37 @@ export default defineConfig({
 
 環境変数 `BWT_CONFIG` に JSON を入れると、CLI オプションのように設定を上書きできます（例: `BWT_CONFIG='{"locators":{"errorFormat":"html"}}' bun test`）。
 
+### backend ごとの互換性
+
+結果を比較するときは `BWT_BACKEND=chrome` / `BWT_BACKEND=webkit` を明示してください。WKWebView は macOS のシステム WebKit を使い、Playwright WebKit とはビルドが異なります。以下は Bun 1.4.2 / macOS 26.6.2 / Chromium 145.0.7632.6 で確認した内容です。エンジンの更新で挙動は変わることがあります。
+
+| 機能・挙動 | Chrome | WKWebView |
+| --- | --- | --- |
+| `focus()` / `:focus` / `document.hasFocus()` | 対応。focus emulation を有効化 | 対応。setup・テストの読み込み前に **iframe 要素**をフォーカス。Shadow DOM も対象 |
+| `userEvent.tab()` | ネイティブのフォーカス移動 | Bun 1.4.2 の修飾キーなし Tab では移動も `keydown` も発生しない。キーボードナビゲーションのテストは Chrome を使用 |
+| `new TouchEvent(...)` | コンストラクターあり | 検証した macOS ビルドでは未提供 |
+| `userEvent.hover()` / `unhover()` | 対応 | 未対応。Chrome backend が必要という明示的なエラー |
+| `history.pushState()` / `replaceState()` | 101回の更新ではエラーなし | 合計100回 / 10秒の制限。101回目の `replaceState()` で `SecurityError` |
+| CSS URL のシリアライズ・寸法 | ブラウザの表記・丸めに従う | 引用符なし URL のエスケープや小数の丸めに差が出る |
+
+**focus と Tab は別の問題です。** iframe の `contentWindow.focus()` だけでは、`activeElement` が更新されても `:focus` が有効にならないことがあります。ランナーはテスト開始前に iframe 要素をフォーカスします。一方、Tab はフォーカス済みでも input 同士の移動ができません。プラグインを使わない `Bun.WebView` でも再現し、Bun は修飾キーなしの Tab をネイティブキーイベントではなく `InsertTab` 編集コマンドへ送っています（[Bun 1.4.2 の実装](https://github.com/oven-sh/bun/blob/744846f844374847c902b5e7fd59b4342a51ef99/src/runtime/webview/WebViewHost.cpp#L494-L579)）。この経路について macOS のキーボードナビゲーション設定の変更は確認済みの回避策ではありません。WebKit がどの要素を Tab 対象にするかは別の問題で、リンクを飛ばすだけでは入力経路の問題と断定できません。
+
+**Touch:** コンストラクターやイベントハンドラーのテストは Chrome で実行し、WKWebView でも実行する場合は API の有無を確認してください。Polyfill や `dispatchEvent(new TouchEvent(...))` は合成イベントであり、実際のタッチ入力を検証できません。このパッケージにはネイティブの tap／タッチエミュレーション用の高水準 API はありません。
+
+**History:** setup・テスト本体・cleanup の更新が同じ回数制限を消費します。冗長な更新を減らし、大きなルーターテストは `.browser.test.ts` を分割してください。Vitest 互換モードではファイルごとに新しい WebView を作ります。`document.body.innerHTML = ''` では History はリセットされず、直接検証した WKWebView では `view.reload()` 後も制限が残りました。新しい WebView ではリセットされます。実行中の Vitest tester iframe を reload するとテストランタイムも再起動するため、状態リセットには使わないでください。WebKit の制限そのものが検証対象でなければ Chrome での実行も選べます。
+
+**CSS:** WebKit では `url(regular.jpg)` が `url(regular\.jpg)` として返ることがあります。カスタムプロパティに URL を設定するときは引用符付きにするか、シリアライズされた CSS にファイル名が含まれるかではなく描画結果を検証してください。寸法はピクセル文字列の完全一致ではなく、コンポーネントに適した誤差を許容して数値を比較します。
+
+```ts
+el.style.setProperty('--image', 'url("regular.jpg")');
+expect(el.getBoundingClientRect().width).toBeCloseTo(100, 3);
+```
+
+Vitest の結果はブラウザ内のテストファイルが完了してから Bun に登録します。実行中の skip とフックの失敗を確定してから報告し、実行対象がない suite 内でも todo は todo として扱います。
+
 ### vitest と同じに動くもの
 
-vitest v5.0.3 の `test/browser`（テスト・fixtures・specs）をこのパッケージに移植してあり、すべて通ります。
+vitest v5.0.3 の `test/browser`（テスト・fixtures・specs）をこのパッケージに移植してあり、Chrome backend ですべて通ります。
 
 - vitest と同じく、テストはオーケストレーターのページに置いた iframe（ビューポートの大きさ）の中で動きます。`window.top` や `window.frameElement` を前提にしたテストもそのまま動きます。
 - Vite と同じようなモジュールごとの配信（ソースマップ付き）、`node_modules` の事前バンドル（CommonJS の named export も含む）、`import.meta.env` と `.env`、CSS / CSS Modules / JSON / `?raw` / `?url` / アセット、エイリアス、`server.headers`、テスターの HTML（`testerHtmlPath`）
