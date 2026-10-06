@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - name: Build type declarations
+        run: bun run build
+      - name: Lint package (publint, are-the-types-wrong)
+        run: bun run lint:package
+      # Ubuntu 24.04 は非特権のユーザー名前空間を AppArmor で制限していて、Chrome のサンドボックスが起動できない
+      - name: Allow Chrome sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Test (Chrome)
+        run: BUN_CHROME_PATH="$(command -v google-chrome)" bun test

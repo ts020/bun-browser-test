@@ -1,0 +1,39 @@
+# changesets で bun-webview-test のバージョンを上げ、npm に公開する。
+# 公開は npm の Trusted Publishing（GitHub Actions の OIDC）で行うので、NPM_TOKEN は不要。
+# npmjs.com のパッケージ設定で、このワークフローのファイル名を Trusted Publisher に登録しておくこと。
+# 手順は RELEASING.md を参照。
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write # Version Packages PR のブランチを push する
+  pull-requests: write # Version Packages PR を作る
+  id-token: write # npm の Trusted Publishing（OIDC）と provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted Publishing には npm 11.5.1 以降が必要
+      - run: npm install -g npm@latest
+      - run: bun install --frozen-lockfile
+      - uses: changesets/action@v1
+        with:
+          version: bun run version
+          publish: bun run release
+          title: "bun-webview-test: Version Packages"
+          commit: "bun-webview-test: Version Packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

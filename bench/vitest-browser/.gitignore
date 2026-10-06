@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+/test/
+results*.json
+bench-out.txt
+startup/.vitest/
+startup/node_modules/

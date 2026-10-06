@@ -1,0 +1,3 @@
+.text.danger { color: rgb(200, 0, 0); }
+.text.muted { color: rgb(120, 120, 120); }
+h1 { font-size: 32px; margin: 0; }

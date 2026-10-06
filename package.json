@@ -1,0 +1,101 @@
+{
+  "name": "bun-webview-test",
+  "version": "0.1.0",
+  "description": "vitest browser mode-like testing for bun test, powered by Bun.WebView",
+  "keywords": [
+    "bun",
+    "bun-test",
+    "testing",
+    "browser",
+    "browser-testing",
+    "webview",
+    "vitest",
+    "component-testing",
+    "e2e"
+  ],
+  "homepage": "https://github.com/ts020/bun-browser-test#readme",
+  "bugs": {
+    "url": "https://github.com/ts020/bun-browser-test/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts020/bun-browser-test.git"
+  },
+  "license": "MIT",
+  "author": "ts020",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./preload": {
+      "types": "./dist/preload.d.ts",
+      "bun": "./src/preload.ts",
+      "default": "./src/preload.ts"
+    },
+    "./vitest-preload": {
+      "types": "./dist/vitest/preload.d.ts",
+      "bun": "./src/vitest/preload.ts",
+      "default": "./src/vitest/preload.ts"
+    },
+    "./vitest": {
+      "types": "./dist/vitest/index.d.ts",
+      "bun": "./src/vitest/index.ts",
+      "default": "./src/vitest/index.ts"
+    },
+    "./vitest-types": {
+      "types": "./src/vitest/types.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.ja.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun scripts/build-types.ts",
+    "lint:package": "publint --strict && attw --pack . --profile esm-only",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish",
+    "prepublishOnly": "bun run build"
+  },
+  "peerDependencies": {
+    "bun-types": ">=1.3.14"
+  },
+  "dependencies": {
+    "@blazediff/core": "^1.10.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitest/browser": "5.0.3",
+    "@vitest/utils": "5.0.3",
+    "es-module-lexer": "^2.3.2",
+    "ivya": "^1.8.2",
+    "pathe": "^2.0.3",
+    "pngjs": "^7.0.0",
+    "vitest": "5.0.3"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@types/bun": "1.3.14",
+    "@types/react": "^19.2.18",
+    "publint": "^0.3.25",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5",
+    "vitest-browser-react": "^2.2.0"
+  }
+}

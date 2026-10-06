@@ -1,0 +1,14 @@
+[test]
+preload = ["./src/preload.ts", "./src/vitest/preload.ts"]
+pathIgnorePatterns = [
+  # vitest との比較ベンチ（bench/vitest-browser/README.md）
+  "bench/**",
+  # 失敗することを確かめるための fixtures。test/browser/specs から個別に実行する
+  "test/browser/fixtures/failing/**",
+  "test/browser/fixtures/timeout/**",
+  "test/browser/fixtures/timeout-hooks/**",
+  "test/browser/fixtures/timeout-actions/**",
+  "test/browser/fixtures/unhandled/**",
+  "test/browser/fixtures/unhandled-non-error/**",
+  "test/browser/fixtures/locator-error-format/**",
+]
