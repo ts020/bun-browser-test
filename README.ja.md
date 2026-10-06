@@ -109,6 +109,9 @@ Hermetic install（`PLAYWRIGHT_BROWSERS_PATH=0`）では `BUN_CHROME_PATH` が�
 macOS では `BWT_BACKEND=webkit` で追加ダウンロード不要の WKWebView を選べます。
 WKWebView は OS の WebKit バージョンに依存し、Tab・hover・touch の制約や History・CSS の挙動差があります（[backend ごとの互換性](#backend-ごとの互換性)）。
 
+macOS では、起動が軽く追加インストールも不要な WKWebView を既定としています。既存テストを複製してファイル数を増やしたローカル検証でも、Chrome より総実行時間が短くなりました。
+ただし OS の WebKit バージョンに依存し、Tab・hover・touch の制約や History・CSS の挙動差があります。必要な機能や Chromium の挙動を検証したい場合は `BWT_BACKEND=chrome` に切り替えてください（[backend ごとの互換性](#backend-ごとの互換性)）。
+
 ## 設定
 
 preload は `expect.element` を足し、テストごとにページを戻し、ページ内の未捕捉例外でテストを落とし、最後にブラウザを閉じます。

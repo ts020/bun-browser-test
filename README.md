@@ -116,6 +116,11 @@ On macOS, `BWT_BACKEND=webkit` opts into the system WKWebView without a browser 
 on the OS's WebKit version and has Tab, hover, touch, History and CSS differences;
 see [Backend compatibility](#backend-compatibility).
 
+WKWebView is the macOS default for its low startup cost and zero browser installation; local scaling checks
+with replicated tests also finished sooner than Chrome. It uses the OS's WebKit version and has limitations
+around Tab, hover and touch, plus History and CSS differences. Use `BWT_BACKEND=chrome` when your tests need
+those features or Chromium behavior; see [Backend compatibility](#backend-compatibility).
+
 ## Configuration
 
 The preload adds `expect.element`, resets the page between tests, fails tests on uncaught page errors, and closes the
