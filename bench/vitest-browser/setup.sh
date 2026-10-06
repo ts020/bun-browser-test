@@ -5,5 +5,5 @@ cd "$(dirname "$0")"
 SRC=../../test/browser
 rm -rf test && mkdir -p test/browser
 cp -r "$SRC"/{test,src,cjs-lib,bundled-lib,custom-tester.html,injected.ts,package.json,.env.local} test/browser/
-cp vitest.config.mts custom-diff-config.ts test/browser/
+cp vitest.config.mts provider.mts custom-diff-config.ts test/browser/
 npm install --no-audit --no-fund

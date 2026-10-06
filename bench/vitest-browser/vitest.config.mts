@@ -5,11 +5,10 @@ import type { BrowserCommand } from 'vitest/node'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as util from 'node:util'
-import { playwright } from '@vitest/browser-playwright'
+import { benchProvider } from './provider.mts'
 import { defineConfig } from 'vitest/config'
 
 const dir = dirname(fileURLToPath(import.meta.url))
-const executablePath = process.env.BENCH_CHROME_PATH ?? `${process.env.PLAYWRIGHT_BROWSERS_PATH}/chromium-1194/chrome-linux/chrome`
 
 const myCustomCommand: BrowserCommand<[arg1: string, arg2: string]> = ({ testPath }, arg1, arg2) => {
   return { testPath, arg1, arg2 }
@@ -36,9 +35,7 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright({
-        launchOptions: { executablePath, args: process.getuid?.() === 0 ? ['--no-sandbox'] : [] },
-      }),
+      provider: benchProvider(),
       instances: [{ browser: 'chromium' }],
       testerHtmlPath: './custom-tester.html',
       orchestratorScripts: [

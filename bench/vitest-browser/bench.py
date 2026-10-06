@@ -38,16 +38,25 @@ CASES = {
         # ワーカー数を bun と同じコア数にそろえた場合
         "vitest-w4": dict(cmd=[VITEST, "run", f"--maxWorkers={os.cpu_count()}"], cwd=SUITE_V,
                           caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(SUITE_V, "node_modules/.vite"), os.path.join(SUITE_V, ".vitest")]),
+        # vitest-browser-bun（vitest を Bun で動かし、provider に Bun.WebView を使う）。既定のファクトリは 1 ファイルずつ
+        "vbb": dict(cmd=["bun", "run", "--bun", VITEST, "run"], cwd=SUITE_V, env={"BENCH_PROVIDER": "bun"},
+                    caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(SUITE_V, "node_modules/.vite"), os.path.join(SUITE_V, ".vitest")]),
+        # vitest-browser-bun + bun-webview-parallel（プールあり）で、コア数のワーカー
+        "vbb-par": dict(cmd=["bun", "run", "--bun", VITEST, "run", f"--maxWorkers={os.cpu_count()}"], cwd=SUITE_V, env={"BENCH_PROVIDER": "bun-parallel"},
+                        caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(SUITE_V, "node_modules/.vite"), os.path.join(SUITE_V, ".vitest")]),
         # bun test と同じく 1 ファイルずつ順に動かした場合
         "vitest-seq": dict(cmd=[VITEST, "run", "--no-file-parallelism"], cwd=SUITE_V,
                            caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(SUITE_V, "node_modules/.vite"), os.path.join(SUITE_V, ".vitest")]),
     },
     # 1 テストだけのファイル。起動と終了にかかる時間
     "startup": {
-        "bwt": dict(cmd=["bun", "test", os.path.join(STARTUP, "trivial.test.ts")], cwd=PKG,
+        # bunfig.toml の pathIgnorePatterns で bench/ を外しているので、それを打ち消す
+        "bwt": dict(cmd=["bun", "test", "--path-ignore-patterns=__none__", os.path.join(STARTUP, "trivial.test.ts")], cwd=PKG,
                     caches=[os.path.join(STARTUP, "node_modules/.bwt")]),
         "vitest": dict(cmd=[VITEST, "run"], cwd=STARTUP,
                        caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(STARTUP, "node_modules/.vite"), os.path.join(STARTUP, ".vitest")]),
+        "vbb": dict(cmd=["bun", "run", "--bun", VITEST, "run"], cwd=STARTUP, env={"BENCH_PROVIDER": "bun"},
+                    caches=[os.path.join(HERE, "node_modules/.vite"), os.path.join(STARTUP, "node_modules/.vite"), os.path.join(STARTUP, ".vitest")]),
     },
 }
 
@@ -107,7 +116,7 @@ def run(c):
     peak = 0
     c0 = cpu_seconds()
     t0 = time.perf_counter()
-    p = subprocess.Popen(c["cmd"], cwd=c["cwd"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    p = subprocess.Popen(c["cmd"], cwd=c["cwd"], env={**env, **c.get("env", {})}, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     done = threading.Event()
 
     def sample():
@@ -137,11 +146,11 @@ def run(c):
 
 def main():
     runs = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    only = sys.argv[2] if len(sys.argv) > 2 else None  # 例: "suite/bwt-par-noiso"
+    only = sys.argv[2:] or None  # 例: "suite/bwt-par-noiso"（複数可、前方一致）
     results = {}
     for case, tools in CASES.items():
         for tool, c in tools.items():
-            if only and not f"{case}/{tool}".startswith(only):
+            if only and not any(f"{case}/{tool}".startswith(o) for o in only):
                 continue
             # 1 回目はディスクキャッシュを温めるための捨て実行
             run(c)
@@ -160,7 +169,7 @@ def main():
                       f"(min {min(w):.2f} max {max(w):.2f})  peak PSS median {statistics.median(m):.0f}MB "
                       f"(max {max(m):.0f})  cpu median {statistics.median(cp):.1f}s  pass={rs[-1]['passed']} fail={rs[-1]['failed']} leftover={rs[-1]['leftover']}",
                       flush=True)
-    with open(os.path.join(HERE, f"results{'-' + only.replace('/', '_') if only else ''}.json"), "w") as f:
+    with open(os.path.join(HERE, f"results{'-' + '+'.join(only).replace('/', '_') if only else ''}.json"), "w") as f:
         json.dump(results, f, indent=1)
 
 
