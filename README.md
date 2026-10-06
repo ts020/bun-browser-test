@@ -2,32 +2,71 @@
 
 [日本語](./README.ja.md)
 
-Browser testing for `bun test`, in the spirit of [Vitest Browser Mode](https://vitest.dev/guide/browser/), powered by [`Bun.WebView`](https://bun.com/docs).
-
-No Playwright, no separate test runner: a real browser (WKWebView on macOS, Chrome elsewhere) runs inside your ordinary `bun test` process.
-
-```ts
-import { expect, test } from "bun:test";
-import { page, userEvent } from "bun-webview-test";
-
-test("counter", async () => {
-  await page.mount(new URL("./Counter.ts", import.meta.url), { initial: 0 });
-
-  await userEvent.click(page.getByRole("button", { name: "Increment" }));
-
-  await expect.element(page.getByRole("status")).toHaveTextContent("count: 1");
-});
-```
+**Browser tests for `bun test`.** A real browser (WKWebView on macOS, Chrome elsewhere) runs inside your ordinary
+`bun test` process through [`Bun.WebView`](https://bun.com/docs), with locators, `userEvent` and `expect.element`
+modeled on [Vitest Browser Mode](https://vitest.dev/guide/browser/). No Playwright, no separate test runner, and
+existing Vitest Browser Mode tests can run as they are.
 
 > [!NOTE]
-> **This is an unofficial, community package. It is not affiliated with Bun or Oven.**
-> bun-webview-test exists only because `bun test` has no browser mode yet, and the hope is that Bun itself will
-> support browser testing natively so that this package can be retired. If Bun ships something equivalent, please use
-> that instead. Requests for a browser mode in Bun belong in [Bun's issue tracker](https://github.com/oven-sh/bun/issues),
-> not here; the author of this package is not on the Bun team and cannot act on them.
+> Unofficial community package, not affiliated with Bun or Oven. See [About this package](#about-this-package).
 
 > [!WARNING]
 > `Bun.WebView` is experimental as of Bun 1.3.14, and so is this package. Expect breaking changes before 1.0.
+
+## Quick start
+
+You need Bun **1.3.14** or later. On macOS that is all; on Linux you also need Chrome or Chromium
+(see [Requirements](#requirements)).
+
+1. Install:
+
+   ```sh
+   bun add -d bun-webview-test
+   ```
+
+2. Register the preload in `bunfig.toml`:
+
+   ```toml
+   [test]
+   preload = ["bun-webview-test/preload"]
+   ```
+
+3. Write something to render and a test for it:
+
+   ```ts
+   // src/counter.ts
+   export default (root: HTMLElement, { initial }: { initial: number }) => {
+     let count = initial;
+     root.innerHTML = `<button>Increment</button><p role="status">count: ${count}</p>`;
+     root.querySelector("button")!.addEventListener("click", () => {
+       root.querySelector("[role=status]")!.textContent = `count: ${++count}`;
+     });
+   };
+   ```
+
+   ```ts
+   // src/counter.test.ts
+   import { expect, test } from "bun:test";
+   import { page, userEvent } from "bun-webview-test";
+
+   test("counter", async () => {
+     await page.mount(new URL("./counter.ts", import.meta.url), { initial: 0 });
+
+     await userEvent.click(page.getByRole("button", { name: "Increment" }));
+
+     await expect.element(page.getByRole("status")).toHaveTextContent("count: 1");
+   });
+   ```
+
+4. Run it:
+
+   ```sh
+   bun test
+   ```
+
+From here: [rendering things](#rendering-something), [locators](#locators), [`expect.element`](#expectelement),
+[settings](#configuration), [CI](#running-in-ci), and
+[running existing Vitest Browser Mode tests](#running-existing-vitest-browser-mode-tests).
 
 ## Requirements
 
@@ -38,31 +77,20 @@ test("counter", async () => {
     `BUN_CHROME_PATH` to the executable, or point `PLAYWRIGHT_BROWSERS_PATH` at a Playwright install and its
     Chromium is used.
 
-## Setup
+## Configuration
 
-1. Install:
+The preload adds `expect.element`, resets the page between tests, fails tests on uncaught page errors, and closes the
+browser at the end.
 
-   ```sh
-   bun add -d bun-webview-test
-   ```
+To change settings, write your own preload and register it instead of `bun-webview-test/preload`:
 
-2. Register the preload in `bunfig.toml`. It adds `expect.element`, resets the page between tests, fails tests on
-   uncaught page errors, and closes the browser at the end.
+```ts
+// test/setup.ts  (and set preload = ["./test/setup.ts"] in bunfig.toml)
+import { configure } from "bun-webview-test";
+import "bun-webview-test/preload";
 
-   ```toml
-   [test]
-   preload = ["bun-webview-test/preload"]
-   ```
-
-3. Optional: to change settings, write your own preload instead.
-
-   ```ts
-   // test/setup.ts  (and set preload = ["./test/setup.ts"] in bunfig.toml)
-   import { configure } from "bun-webview-test";
-   import "bun-webview-test/preload";
-
-   configure({ width: 375, height: 812, expectTimeout: 2000, publicDir: "./public" });
-   ```
+configure({ width: 375, height: 812, expectTimeout: 2000, publicDir: "./public" });
+```
 
 The browser starts the first time a test touches `page` and is shared by every test file (Chrome takes about a
 second to start; resetting the page between tests takes tens of milliseconds). Tests that never touch `page`
@@ -228,6 +256,30 @@ Vitest 5.0.3's own `test/browser` suite (tests, fixtures and specs) is ported in
   suite's `afterAll` (Vitest reports both as suite failures).
 - Unhandled errors are reported as an `(unnamed)` failure at the end of the file.
 
+## Running in CI
+
+On GitHub Actions' Ubuntu 24.04 runners, Chrome's sandbox is blocked by AppArmor unless you lift the restriction on
+unprivileged user namespaces:
+
+```yaml
+- uses: oven-sh/setup-bun@v2
+- run: bun install --frozen-lockfile
+- run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+- run: BUN_CHROME_PATH="$(command -v google-chrome)" bun test
+```
+
+When running as root (for example in Docker), `--no-sandbox` is added automatically.
+
+The browser is launched by the first test that touches `page`, and that launch counts against the test's timeout.
+On a cold CI runner Chrome can take several seconds to start, so start it in a `beforeAll` with a longer timeout:
+
+```ts
+import { beforeAll } from "bun:test";
+import { getSession } from "bun-webview-test";
+
+beforeAll(() => getSession(), 30_000);
+```
+
 ## Performance
 
 Measured against Vitest 5.0.3 Browser Mode (`@vitest/browser-playwright`) on the same 4-core machine with the same
@@ -254,29 +306,14 @@ With `--parallel --no-isolate`, bun-webview-test runs the suite about 20% faster
 and starts about 4x faster. Run one file at a time, its peak memory (the PSS of the process tree including Chromium)
 is about half of Vitest's (382MB vs 770MB).
 
-## Running in CI
+## About this package
 
-On GitHub Actions' Ubuntu 24.04 runners, Chrome's sandbox is blocked by AppArmor unless you lift the restriction on
-unprivileged user namespaces:
+This is an unofficial, community package. It is not affiliated with Bun or Oven.
 
-```yaml
-- uses: oven-sh/setup-bun@v2
-- run: bun install --frozen-lockfile
-- run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-- run: BUN_CHROME_PATH="$(command -v google-chrome)" bun test
-```
-
-When running as root (for example in Docker), `--no-sandbox` is added automatically.
-
-The browser is launched by the first test that touches `page`, and that launch counts against the test's timeout.
-On a cold CI runner Chrome can take several seconds to start, so start it in a `beforeAll` with a longer timeout:
-
-```ts
-import { beforeAll } from "bun:test";
-import { getSession } from "bun-webview-test";
-
-beforeAll(() => getSession(), 30_000);
-```
+bun-webview-test exists only because `bun test` has no browser mode yet, and the hope is that Bun itself will
+support browser testing natively so that this package can be retired. If Bun ships something equivalent, please use
+that instead. Requests for a browser mode in Bun belong in [Bun's issue tracker](https://github.com/oven-sh/bun/issues),
+not here; the author of this package is not on the Bun team and cannot act on them.
 
 ## Contributing
 

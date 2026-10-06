@@ -2,31 +2,68 @@
 
 [English](./README.md)
 
-`bun test` と [`Bun.WebView`](https://bun.com/docs) で、[vitest のブラウザモード](https://vitest.dev/guide/browser/)のようなテストを書くためのモジュールです。
-Playwright も別プロセスのテストランナーも使わず、`bun test` の中で本物のブラウザ（macOS は WKWebView、それ以外は Chrome）を動かします。
-
-```ts
-import { expect, test } from "bun:test";
-import { page, userEvent } from "bun-webview-test";
-
-test("カウンター", async () => {
-  await page.mount(new URL("./Counter.ts", import.meta.url), { initial: 0 });
-
-  await userEvent.click(page.getByRole("button", { name: "Increment" }));
-
-  await expect.element(page.getByRole("status")).toHaveTextContent("count: 1");
-});
-```
+**`bun test` でブラウザのテストを書くためのモジュールです。** [`Bun.WebView`](https://bun.com/docs) で本物のブラウザ（macOS は
+WKWebView、それ以外は Chrome）をふだんの `bun test` の中で動かし、[vitest のブラウザモード](https://vitest.dev/guide/browser/)と同じ形の
+ロケーター、`userEvent`、`expect.element` で操作します。Playwright も別のテストランナーも要りません。vitest のブラウザモードのテストも、そのまま動かせます。
 
 > [!NOTE]
-> **非公式のモジュールです。Bun（Oven）とは関係ありません。**
-> bun-webview-test は、`bun test` にまだブラウザモードがないので作ったものです。Bun 本体がブラウザでのテストをサポートし、
-> このモジュールが役目を終える日が来ることを望んでいます。Bun に同等の機能が入ったら、そちらを使ってください。
-> Bun へのブラウザモードの要望は、作者ではなく [Bun の issue](https://github.com/oven-sh/bun/issues) に送ってください。
-> 作者は Bun のチームの人間ではないので、Bun 本体への要望には対応できません。
+> 非公式のモジュールで、Bun（Oven）とは関係ありません。詳しくは[このモジュールについて](#このモジュールについて)を見てください。
 
 > [!WARNING]
 > `Bun.WebView` は Bun 1.3.14 時点で experimental で、このモジュールも同じく実験的です。1.0 までは破壊的な変更が入ることがあります。
+
+## クイックスタート
+
+Bun **1.3.14** 以降が必要です。macOS ならそれだけで動きます。Linux では Chrome か Chromium も必要です（[必要なもの](#必要なもの)）。
+
+1. インストールします。
+
+   ```sh
+   bun add -d bun-webview-test
+   ```
+
+2. `bunfig.toml` に preload を足します。
+
+   ```toml
+   [test]
+   preload = ["bun-webview-test/preload"]
+   ```
+
+3. 表示するものと、そのテストを書きます。
+
+   ```ts
+   // src/counter.ts
+   export default (root: HTMLElement, { initial }: { initial: number }) => {
+     let count = initial;
+     root.innerHTML = `<button>Increment</button><p role="status">count: ${count}</p>`;
+     root.querySelector("button")!.addEventListener("click", () => {
+       root.querySelector("[role=status]")!.textContent = `count: ${++count}`;
+     });
+   };
+   ```
+
+   ```ts
+   // src/counter.test.ts
+   import { expect, test } from "bun:test";
+   import { page, userEvent } from "bun-webview-test";
+
+   test("カウンター", async () => {
+     await page.mount(new URL("./counter.ts", import.meta.url), { initial: 0 });
+
+     await userEvent.click(page.getByRole("button", { name: "Increment" }));
+
+     await expect.element(page.getByRole("status")).toHaveTextContent("count: 1");
+   });
+   ```
+
+4. 実行します。
+
+   ```sh
+   bun test
+   ```
+
+続きは、[ページに何かを表示する](#ページに何かを表示する)、[ロケーター](#ロケーター)、[expect.element](#expectelement)、
+[設定](#設定)、[CI で動かす](#ci-で動かす)、[vitest のブラウザモードのテストをそのまま動かす](#vitest-のブラウザモードのテストをそのまま動かす)を見てください。
 
 ## 必要なもの
 
@@ -36,31 +73,19 @@ test("カウンター", async () => {
   - **Linux など**: Chrome か Chromium。インストール済みの Chrome は Bun が自動で見つけます。見つからないときは `BUN_CHROME_PATH`
     に実行ファイルのパスを入れるか、`PLAYWRIGHT_BROWSERS_PATH` を Playwright のインストール先に向けるとその Chromium を使います。
 
-## セットアップ
+## 設定
 
-1. インストールします。
+preload は `expect.element` を足し、テストごとにページを戻し、ページ内の未捕捉例外でテストを落とし、最後にブラウザを閉じます。
 
-   ```sh
-   bun add -d bun-webview-test
-   ```
+設定を変えたいときは、`bun-webview-test/preload` の代わりに自分の preload を登録します。
 
-2. `bunfig.toml` に preload を足します。preload は `expect.element` を足し、テストごとにページを戻し、ページ内の未捕捉例外で
-   テストを落とし、最後にブラウザを閉じます。
+```ts
+// test/setup.ts  （bunfig.toml の preload に "./test/setup.ts" を書く）
+import { configure } from "bun-webview-test";
+import "bun-webview-test/preload";
 
-   ```toml
-   [test]
-   preload = ["bun-webview-test/preload"]
-   ```
-
-3. 設定を変えたいときは、自分の preload を作ります（任意）。
-
-   ```ts
-   // test/setup.ts  （bunfig.toml の preload に "./test/setup.ts" を書く）
-   import { configure } from "bun-webview-test";
-   import "bun-webview-test/preload";
-
-   configure({ width: 375, height: 812, expectTimeout: 2000, publicDir: "./public" });
-   ```
+configure({ width: 375, height: 812, expectTimeout: 2000, publicDir: "./public" });
+```
 
 ブラウザは最初に `page` を触ったときに 1 回だけ起動し、全テストファイルで使い回します（Chrome の起動は 1 秒ほど、以後のページリセットは数十 ms）。ブラウザを使わないテストには何のコストもかかりません。
 
@@ -68,7 +93,7 @@ test("カウンター", async () => {
 
 `bun test --parallel`（と `--isolate`）でも使えます。Chrome はワーカーのプロセスごとに 1 回だけ起動し、ファイルごとに global が作り直されても使い回します（プロセスが終わると止まります）。この使い回しをやめたいときは `BWT_SHARED_CHROME=0` にします。
 
-### 設定
+### 設定の一覧
 
 | 設定 | 既定値 | 説明 |
 | --- | --- | --- |
@@ -188,27 +213,6 @@ vitest v5.0.3 の `test/browser`（テスト・fixtures・specs）をこのパ�
 - `beforeAll` の失敗は、そのスイートの最初のテストの失敗として、`afterAll` の失敗はスイートの `afterAll` として `bun test` に表示されます（vitest はスイートの失敗として表示します）。
 - 未捕捉エラーはファイルの最後に `(unnamed)` の失敗として表示されます。
 
-## 速度
-
-vitest 5.0.3 のブラウザモード（`@vitest/browser-playwright`）と、同じマシン（4 コア）・同じヘッドレス Chromium で、移植した `test/browser/test`（21 ファイル、127 テスト）を動かして比べました。時間はプロセスの起動から終了まで、warm で 5 回の中央値です。計測スクリプトは [`bench/vitest-browser`](bench/vitest-browser) にあります。
-
-| | 時間 |
-| --- | --- |
-| bun-webview-test、`bun test --parallel --no-isolate`（推奨） | **5.0s** |
-| bun-webview-test、`bun test --parallel` | 5.5s |
-| bun-webview-test、`bun test`（1 ファイルずつ） | 7.5s |
-| vitest（既定、ファイル並列） | 6.3s |
-| vitest（`--no-file-parallelism`） | 7.6s |
-
-起動（テスト 1 件だけのファイル。cold はキャッシュ `.vite` / `.bwt` を消してからの値）
-
-| | 時間 cold / warm | 最大メモリ |
-| --- | --- | --- |
-| bun-webview-test | 0.53s / 0.53s | 329MB |
-| vitest | 2.42s / 2.00s | 788MB / 567MB |
-
-`--parallel --no-isolate` なら、テスト全体は vitest の既定の並列実行より約 2 割速く、起動は約 4 倍速くなります。1 ファイルずつ動かしたときの最大メモリ（Chromium を含むプロセス全体の PSS）は、vitest のおよそ半分です（382MB と 770MB）。
-
 ## CI で動かす
 
 GitHub Actions の Ubuntu 24.04 ランナーでは、AppArmor が非特権のユーザー名前空間を制限しているため、そのままでは Chrome のサンドボックスが起動できません。
@@ -230,6 +234,36 @@ import { getSession } from "bun-webview-test";
 
 beforeAll(() => getSession(), 30_000);
 ```
+
+## 速度
+
+vitest 5.0.3 のブラウザモード（`@vitest/browser-playwright`）と、同じマシン（4 コア）・同じヘッドレス Chromium で、移植した `test/browser/test`（21 ファイル、127 テスト）を動かして比べました。時間はプロセスの起動から終了まで、warm で 5 回の中央値です。計測スクリプトは [`bench/vitest-browser`](bench/vitest-browser) にあります。
+
+| | 時間 |
+| --- | --- |
+| bun-webview-test、`bun test --parallel --no-isolate`（推奨） | **5.0s** |
+| bun-webview-test、`bun test --parallel` | 5.5s |
+| bun-webview-test、`bun test`（1 ファイルずつ） | 7.5s |
+| vitest（既定、ファイル並列） | 6.3s |
+| vitest（`--no-file-parallelism`） | 7.6s |
+
+起動（テスト 1 件だけのファイル。cold はキャッシュ `.vite` / `.bwt` を消してからの値）
+
+| | 時間 cold / warm | 最大メモリ |
+| --- | --- | --- |
+| bun-webview-test | 0.53s / 0.53s | 329MB |
+| vitest | 2.42s / 2.00s | 788MB / 567MB |
+
+`--parallel --no-isolate` なら、テスト全体は vitest の既定の並列実行より約 2 割速く、起動は約 4 倍速くなります。1 ファイルずつ動かしたときの最大メモリ（Chromium を含むプロセス全体の PSS）は、vitest のおよそ半分です（382MB と 770MB）。
+
+## このモジュールについて
+
+非公式のモジュールです。Bun（Oven）とは関係ありません。
+
+bun-webview-test は、`bun test` にまだブラウザモードがないので作ったものです。Bun 本体がブラウザでのテストをサポートし、
+このモジュールが役目を終える日が来ることを望んでいます。Bun に同等の機能が入ったら、そちらを使ってください。
+Bun へのブラウザモードの要望は、作者ではなく [Bun の issue](https://github.com/oven-sh/bun/issues) に送ってください。
+作者は Bun のチームの人間ではないので、Bun 本体への要望には対応できません。
 
 ## 開発
 
