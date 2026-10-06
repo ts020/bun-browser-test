@@ -77,6 +77,11 @@ From here: [rendering things](#rendering-something), [locators](#locators), [`ex
     `BUN_CHROME_PATH` to the executable, or point `PLAYWRIGHT_BROWSERS_PATH` at a Playwright install and its
     Chromium is used.
 
+WKWebView is the macOS default for its low startup cost and zero browser installation; local scaling checks
+with replicated tests also finished sooner than Chrome. It uses the OS's WebKit version and has limitations
+around Tab, hover and touch, plus History and CSS differences. Use `BWT_BACKEND=chrome` when your tests need
+those features or Chromium behavior; see [Backend compatibility](#backend-compatibility).
+
 ## Configuration
 
 The preload adds `expect.element`, resets the page between tests, fails tests on uncaught page errors, and closes the
@@ -213,9 +218,56 @@ export default defineConfig({
 Put JSON in the `BWT_CONFIG` environment variable to override settings like CLI flags, e.g.
 `BWT_CONFIG='{"locators":{"errorFormat":"html"}}' bun test`.
 
+### Backend compatibility
+
+Set `BWT_BACKEND=chrome` or `BWT_BACKEND=webkit` when comparing results. WKWebView uses the macOS system
+WebKit; it is a different build from Playwright WebKit. The following was checked with Bun 1.4.2,
+macOS 26.6.2 and Chromium 145.0.7632.6; engine behavior may change with upgrades.
+
+| Behavior | Chrome | WKWebView |
+| --- | --- | --- |
+| `focus()`, `:focus`, `document.hasFocus()` | Supported; focus emulation is enabled | Supported; the runner focuses the **iframe element** before loading setup files and tests, including Shadow DOM tests |
+| `userEvent.tab()` | Native focus traversal | Bun 1.4.2's unmodified Tab does not traverse focus or emit `keydown`; use Chrome for keyboard navigation tests |
+| `new TouchEvent(...)` | Constructor available | Constructor unavailable in the tested macOS build |
+| `userEvent.hover()` / `unhover()` | Supported | Unsupported; throws an explicit Chrome-backend-required error |
+| `history.pushState()` / `replaceState()` | No failure in the 101-update check | Shared limit of 100 updates per 10 seconds; the 101st `replaceState()` threw `SecurityError` |
+| CSS URL serialization / layout dimensions | Browser serialization and rounding apply | Unquoted URLs may contain escapes; fractional layout results may differ |
+
+**Focus and Tab are separate.** Focusing only the iframe's `contentWindow` can update `activeElement`
+without activating `:focus`. The runner now focuses the iframe element before executing the file.
+Tab still fails in a focused WKWebView, including between two inputs. A direct `Bun.WebView` reproduction
+also fails: Bun routes unmodified Tab to the `InsertTab` editing command instead of the native key-event
+path ([Bun 1.4.2 implementation](https://github.com/oven-sh/bun/blob/744846f844374847c902b5e7fd59b4342a51ef99/src/runtime/webview/WebViewHost.cpp#L494-L579)).
+Changing macOS keyboard-navigation settings is not a verified workaround for this path. WebKit's choice
+of tabbable elements is a separate issue; a skipped link alone does not diagnose the input-delivery problem.
+
+**Touch:** run constructor and event-handler tests on Chrome, with a feature check if they must also run
+on WKWebView. A polyfill or `dispatchEvent(new TouchEvent(...))` produces synthetic events; it does not
+verify native touch input. This package does not provide a high-level native tap/touch-emulation API.
+
+**History:** setup, test bodies and cleanup share the update budget. Reduce redundant navigation and
+split large router suites into separate `.browser.test.ts` files: Vitest compatibility mode creates a new
+WebView for each file. `document.body.innerHTML = ''` does not reset History, and even `view.reload()`
+retained the exhausted budget in the direct WKWebView check. A fresh WebView reset it. Do not reload the
+running Vitest tester iframe to reset state; that also restarts its test runtime. Chrome is an alternative
+when WebKit's throttling is outside the behavior under test.
+
+**CSS:** `url(regular.jpg)` may serialize as `url(regular\.jpg)` in WebKit. Prefer quoted URLs when
+constructing custom properties, or compare the rendered result rather than searching serialized CSS
+for an unescaped filename. For layout assertions, compare numeric dimensions with a tolerance that fits
+the component instead of requiring identical pixel strings:
+
+```ts
+el.style.setProperty('--image', 'url("regular.jpg")');
+expect(el.getBoundingClientRect().width).toBeCloseTo(100, 3);
+```
+
+Vitest results are registered with Bun after each browser test file finishes, so runtime skips and hook
+failures are known before reporting. A todo remains a todo even in a suite with no runnable tests.
+
 ### What works like Vitest
 
-Vitest 5.0.3's own `test/browser` suite (tests, fixtures and specs) is ported into this package and passes.
+Vitest 5.0.3's own `test/browser` suite (tests, fixtures and specs) is ported into this package and passes on the Chrome backend.
 
 - Tests run in an iframe (sized to the viewport) on an orchestrator page, as in Vitest, so tests relying on
   `window.top` or `window.frameElement` work.

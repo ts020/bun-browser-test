@@ -209,6 +209,9 @@ class BunWebViewTestRunner extends (TestRunner as any) {
 }
 
 async function run() {
+  // WKWebView では contentWindow.focus() だけでは :focus / hasFocus が有効に
+  // ならない。setup / テストを読み込む前に親ページの iframe 要素をフォーカスする。
+  (window.frameElement as HTMLElement | null)?.focus();
   const snapshotEnv = new BrowserSnapshotEnvironment();
   config.snapshotOptions.snapshotEnvironment = snapshotEnv;
 

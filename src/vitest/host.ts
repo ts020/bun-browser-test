@@ -264,9 +264,7 @@ class FileSession {
   readonly collected = deferred<SerializedTask[]>();
   readonly finished = deferred<void>();
   private results = new Map<string, TaskResult>();
-  private done = new Set<string>();
   readonly failureScreenshots = new Map<string, string[]>();
-  private waiters = new Map<string, ReturnType<typeof deferred<TaskResult>>>();
   private parents = new Map<string, string>();
   readonly unhandled: SerializedError[] = [];
   private cdpListening = new Set<string>();
@@ -306,8 +304,6 @@ const iframe = document.getElementById("vitest-tester");
 for (const name of ["__bwt_tester__", "__vitest_browser_runner__", "__bwt_early_errors__"]) {
   Object.defineProperty(window, name, { get: () => iframe.contentWindow[name] });
 }
-// キー入力がテスターに届くよう、iframe にフォーカスしておく
-iframe.addEventListener("load", () => iframe.contentWindow.focus());
 </script>
 </body>
 </html>`;
@@ -494,13 +490,6 @@ ${scripts}
           if (!result) continue;
           this.results.set(id, result);
         }
-        // state が pass になっても afterEach などがまだ走るので、終了イベントで確定させる
-        for (const [id, event] of (args[1] ?? []) as [string, string, unknown][]) {
-          if (event !== "test-finished" && event !== "suite-finished") continue;
-          this.done.add(id);
-          const r = this.results.get(id);
-          if (r) this.waiters.get(id)?.resolve(r);
-        }
         return;
       }
       case "onUnhandledError": {
@@ -513,10 +502,6 @@ ${scripts}
       }
       case "onFinished":
         this.finished.resolve();
-        for (const [id, w] of this.waiters) {
-          const r = this.results.get(id);
-          w.resolve(r && ["pass", "fail", "skip", "todo"].includes(r.state) ? r : { state: "skip" });
-        }
         return;
       case "input":
         return this.runInput(args[0]);
@@ -741,27 +726,8 @@ ${scripts}
 
   // ---- bun test への登録 ----
 
-  waitFor(id: string): Promise<TaskResult> {
-    const r = this.results.get(id);
-    if (r && this.done.has(id)) return Promise.resolve(r);
-    let w = this.waiters.get(id);
-    if (!w) {
-      w = deferred<TaskResult>();
-      this.waiters.set(id, w);
-    }
-    return w.promise;
-  }
-
   resultOf(id: string): TaskResult | undefined {
     return this.results.get(id);
-  }
-
-  async ancestorErrorsSettled(id: string): Promise<SerializedError[]> {
-    for (let p = this.parents.get(id); p; p = this.parents.get(p)) {
-      const r = await this.waitFor(p);
-      if (r.state === "fail" && r.errors?.length) return r.errors;
-    }
-    return [];
   }
 
   /** テストが失敗していなくても、親のスイートのフック（beforeAll など）が失敗していればそのエラー。 */
@@ -807,19 +773,20 @@ const LONG = 2 ** 31 - 1;
 function registerTasks(session: FileSession, tasks: SerializedTask[]) {
   for (const task of tasks) {
     if (task.type === "suite") {
-      const body = () => {
+      describe(task.name, () => {
         registerTasks(session, task.tasks ?? []);
+        // Vitest は todo だけの suite も skip にする。子の mode を保ち、
+        // 実行されない suite に Bun のフック由来の (unnamed) を追加しない。
+        if (task.mode === "skip" || task.mode === "todo") return;
         afterAll(async () => {
-          const r = await session.waitFor(task.id);
+          const r = session.resultOf(task.id);
           // テストに紐付かないスイートのエラー（afterAll の失敗など）はここで報告する
           const testsFailed = (task.tasks ?? []).some(
             (t) => session.resultOf(t.id)?.state === "skip" && session.ancestorErrors(t.id).length,
           );
-          if (r.state === "fail" && r.errors?.length && !testsFailed) throw combine(r.errors);
+          if (r?.state === "fail" && r.errors?.length && !testsFailed) throw combine(r.errors);
         }, LONG);
-      };
-      if (task.mode === "skip" || task.mode === "todo") describe.skip(task.name, body);
-      else describe(task.name, body);
+      });
       continue;
     }
     if (task.mode === "todo") {
@@ -830,10 +797,15 @@ function registerTasks(session: FileSession, tasks: SerializedTask[]) {
       test.skip(task.name, () => {});
       continue;
     }
+    const r = session.resultOf(task.id) ?? { state: "skip" };
+    const inherited = r.state === "skip" ? session.ancestorErrors(task.id) : [];
+    if (r.state === "skip" && !inherited.length) {
+      test.skip(task.name, () => {});
+      continue;
+    }
     test(
       task.name,
       async () => {
-        const r = await session.waitFor(task.id);
         if (r.state === "fail") {
           const err = combine(r.errors?.length ? r.errors : [{ message: "Test failed" }]);
           const shots = [...new Set(session.failureScreenshots.get(task.id) ?? [])];
@@ -844,11 +816,8 @@ function registerTasks(session: FileSession, tasks: SerializedTask[]) {
           }
           throw err;
         }
-        if (r.state === "skip") {
-          // beforeAll が失敗するとテストは skip になる。そのエラーはスイートの終了を待ってテスト側で報告する
-          const inherited = await session.ancestorErrorsSettled(task.id);
-          if (inherited.length) throw combine(inherited);
-        }
+        // beforeAll の失敗で skip になった場合は、成功や skip にせずエラーを報告する。
+        if (inherited.length) throw combine(inherited);
       },
       LONG,
     );
@@ -874,6 +843,9 @@ export async function runBrowserTestFile(filepath: string): Promise<void> {
     });
     return;
   }
+  // bun:test には実行中のテストを skip に変える公開 API がないため、
+  // ブラウザ側のフックまで完了してから最終結果に合わせて登録する。
+  await session.finished.promise;
   const file = fileTasks[0]!;
   if (file.result?.state === "fail" && file.result.errors?.length) {
     const errors = file.result.errors;
