@@ -1,6 +1,6 @@
 {
   "name": "bun-webview-test",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "vitest browser mode-like testing for bun test, powered by Bun.WebView",
   "keywords": [
     "bun",
@@ -25,7 +25,7 @@
   "author": "ts020",
   "type": "module",
   "bin": {
-    "bun-webview-test": "./src/cli.ts"
+    "bun-webview-test": "src/cli.ts"
   },
   "exports": {
     ".": {
