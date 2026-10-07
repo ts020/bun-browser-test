@@ -40,22 +40,21 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: bun install --frozen-lockfile
+      - name: Check memory accounting
+        run: python3 -m unittest discover -s bench/vitest-browser -p test_scaling.py -v
       - name: Allow Chrome sandbox
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Install pinned Chrome Headless Shell
         run: bun src/cli.ts install
-      - name: Compare bun-webview-test and Vitest
+      - name: Benchmark bun-webview-test
         shell: bash
         run: |
           shell_path="$(bun -e 'import { installedHeadlessShell } from "./src/browser-binary"; const path = installedHeadlessShell(); if (!path) throw new Error("Headless Shell missing"); console.log(path);')"
-          python3 bench/vitest-browser/scaling.py --chrome-shell "$shell_path" --groups 20 --workers 2 --runs 3
+          python3 bench/vitest-browser/scaling.py --chrome-shell "$shell_path" --groups 20 --workers 2 --runs 1 --memory --bun-only
       - name: Publish benchmark summary
         if: always()
         shell: bash

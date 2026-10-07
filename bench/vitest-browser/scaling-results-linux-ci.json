@@ -1,0 +1,86 @@
+{
+  "run_url": "https://github.com/ts020/bun-browser-test/actions/runs/37550092193",
+  "run_id": 37550092193,
+  "run_attempt": 1,
+  "runner_image": "ubuntu-24.04",
+  "metadata": {
+    "os": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "workers": 2,
+    "groups": 20,
+    "warmup_runs": 1,
+    "measured_runs": 3,
+    "cpu_count": 4,
+    "commit": "0e12d1a0cab7d43e59c7a0f3fd76b764885832c0",
+    "bun": "1.4.2+744846f84",
+    "node": "v24.21.0",
+    "vitest": "5.0.3",
+    "playwright": "1.56.1",
+    "test_sha256": {
+      "basic": "ec0667e5ffaf4c16b434dfd8f7cd69052175cb325e3b52e04bbb370ac3051cd4",
+      "dom": "211540f22a38384b4585aa341f293dc2cef06a411820af77a711486d12c05292",
+      "env": "9b111dee4c34c8f61cc2cdd63db05a10e0bd2f5b5dd8b754aa414f19df56c478",
+      "findElement": "58731c9a74bbd00897ddecd7b2cb1054bf1eef7758dddf45b6169b068e326e9e",
+      "utils": "be609067f7b621f632c71948958362b0ae8e193afbdd78e5f61ddd8bd3c86576"
+    },
+    "measurement": "Fresh processes, sequential runners, rotated order, wall time including startup/exit. Repeated fixtures; memory not measured.",
+    "chromium_shell_executable": "/home/runner/work/bun-browser-test/bun-browser-test/.cache/bun-webview-test/145.0.7632.6-linux64/chrome-headless-shell-linux64/chrome-headless-shell",
+    "chromium_shell": "Google Chrome for Testing 145.0.7632.6"
+  },
+  "samples": [
+    {
+      "runner": "chrome-shell",
+      "iteration": 0,
+      "seconds": 10.234580354000002,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "iteration": 0,
+      "seconds": 13.656162977000001,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "iteration": 1,
+      "seconds": 12.93525731199999,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "iteration": 1,
+      "seconds": 10.354129204000003,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "iteration": 2,
+      "seconds": 10.29911304400001,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "iteration": 2,
+      "seconds": 12.994062858000007,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "iteration": 3,
+      "seconds": 13.194542838000018,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "iteration": 3,
+      "seconds": 10.307804731999994,
+      "ok": true
+    }
+  ],
+  "summary": {
+    "medians": {
+      "chrome-shell": 10.307804731999994,
+      "vitest-shell": 12.994062858000007
+    },
+    "shell_time_reduction_vs_vitest_percent": 20.672965456267388
+  }
+}
