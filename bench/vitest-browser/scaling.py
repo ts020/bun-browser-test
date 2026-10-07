@@ -8,15 +8,145 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import signal
 import statistics
 import subprocess
+import threading
 import time
+import uuid
 
 BENCH = Path(__file__).resolve().parent
 REPO = BENCH.parents[1]
 SOURCE = REPO / 'test/browser'
 WORK = BENCH / '.scaling'
 FILES = ['basic', 'dom', 'env', 'findElement', 'utils']  # 40 tests, 5 screenshots per group
+SAMPLE_INTERVAL = 0.05
+
+
+def run_processes(root, marker, known, proc_dir=Path('/proc')):
+    """Include reparented/browser processes; never include unrelated Chrome instances.
+
+    Bun's shared Chrome is reparented and Playwright starts a new session. The
+    inherited per-run environment marker catches both, even between samples.
+    Start times guard against PID reuse after an observed process exits.
+    """
+    processes = {}
+    for entry in proc_dir.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            fields = (entry / 'stat').read_text().rsplit(')', 1)[1].split()
+            pid = int(entry.name)
+            processes[pid] = (int(fields[1]), int(fields[3]), int(fields[19]), fields[0])
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+    selected = set()
+    for pid, (_, session, started, state) in processes.items():
+        if state == 'Z':
+            continue
+        if session == root or known.get(pid) == started:
+            selected.add(pid)
+            continue
+        try:
+            if marker in (proc_dir / str(pid) / 'environ').read_bytes().split(b'\0'):
+                selected.add(pid)
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            # Unrelated users' environments are normally inaccessible.
+            pass
+    while True:
+        children = {pid for pid, (parent, _, _, state) in processes.items() if parent in selected and state != 'Z'}
+        if children <= selected:
+            break
+        selected |= children
+    known.clear()
+    known.update({pid: processes[pid][2] for pid in selected})
+    return selected
+
+
+def sample_pss(pids, proc_dir=Path('/proc')):
+    total_kib, count = 0, 0
+    for pid in pids:
+        try:
+            text = (proc_dir / str(pid) / 'smaps_rollup').read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            continue  # A process can exit during a sample.
+        # Permission errors and missing PSS must fail, not silently count as zero.
+        match = re.search(r'^Pss:\s+(\d+) kB$', text, re.M)
+        if not match:
+            try:
+                if (proc_dir / str(pid) / 'stat').read_text().rsplit(')', 1)[1].split()[0] == 'Z':
+                    continue
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            raise RuntimeError(f'PSS unavailable for process {pid}')
+        total_kib += int(match[1])
+        count += 1
+    return total_kib / 1024, count
+
+
+def run_case(command, env, log_path, memory=False, timeout=180):
+    linux = platform.system() == 'Linux'
+    token = uuid.uuid4().hex
+    marker = f'BWT_BENCH_RUN_ID={token}'.encode()
+    known = {}
+    done = threading.Event()
+    errors = []
+    stats = {'peak_pss_mib': 0, 'memory_samples': 0, 'peak_process_count': 0}
+    with log_path.open('w') as log:
+        start = time.perf_counter()
+        process = subprocess.Popen(command, cwd=REPO, env={**env, 'BWT_BENCH_RUN_ID': token},
+                                   stdout=log, stderr=subprocess.STDOUT, start_new_session=os.name == 'posix')
+
+        def sample():
+            try:
+                while not done.is_set():
+                    tick = time.perf_counter()
+                    pss, count = sample_pss(run_processes(process.pid, marker, known))
+                    if count:
+                        stats['memory_samples'] += 1
+                        if pss > stats['peak_pss_mib']:
+                            stats.update(peak_pss_mib=pss, peak_process_count=count)
+                    done.wait(max(0, SAMPLE_INTERVAL - (time.perf_counter() - tick)))
+            except Exception as error:
+                errors.append(error)
+
+        sampler = threading.Thread(target=sample) if memory else None
+        if sampler:
+            sampler.start()
+        try:
+            code = process.wait(timeout=timeout)
+            elapsed = time.perf_counter() - start
+        except subprocess.TimeoutExpired:
+            log.write(f'\nBenchmark timed out after {timeout} seconds.\n')
+            raise
+        finally:
+            done.set()
+            if sampler:
+                sampler.join()
+            if process.poll() is None:
+                if os.name == 'posix':
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()
+                process.wait()
+            if linux:
+                # Shared Chrome exits shortly after its worker. Wait outside the
+                # timing interval so the next runner cannot inherit its memory.
+                deadline = time.monotonic() + 3
+                while remaining := run_processes(process.pid, marker, known):
+                    if time.monotonic() >= deadline:
+                        for pid in remaining:
+                            try:
+                                os.kill(pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                        raise RuntimeError(f'Benchmark left {len(remaining)} processes running; killed them')
+                    time.sleep(SAMPLE_INTERVAL)
+        if errors:
+            raise RuntimeError('Memory sampling failed; refusing to report partial PSS') from errors[0]
+        if memory and not stats['memory_samples']:
+            raise RuntimeError('No PSS samples collected')
+    return code, elapsed, stats if memory else {}
 
 
 def main():
@@ -24,9 +154,10 @@ def main():
     parser.add_argument('--chrome', default=os.environ.get('BUN_CHROME_PATH'), help='Compare both runners using this regular Chrome executable')
     parser.add_argument('--chrome-shell', help='Compare both runners using this Chrome Headless Shell executable; can be used alone')
     parser.add_argument('--groups', type=int, default=20)
-    parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--workers', type=int, default=2)
     parser.add_argument('--runs', type=int, default=3)
     parser.add_argument('--webkit', action='store_true', help='Also measure WKWebView on macOS')
+    parser.add_argument('--memory', action='store_true', help='Linux only: add separate process-tree peak PSS runs for every runner')
     args = parser.parse_args()
     if min(args.groups, args.workers, args.runs) < 1:
         parser.error('groups, workers and runs must be positive')
@@ -40,6 +171,10 @@ def main():
         parser.error(f'Chrome Headless Shell executable not found: {chrome_shell}')
     if args.webkit and platform.system() != 'Darwin':
         parser.error('WKWebView requires macOS')
+    if args.memory and platform.system() != 'Linux':
+        parser.error('--memory requires Linux /proc; memory is not approximated with RSS on other OSes')
+    if args.memory:
+        sample_pss({os.getpid()})  # Fail before installing dependencies if /proc is restricted.
 
     WORK.mkdir(exist_ok=True)
     for pattern in ['*.log', 'results.json', 'metadata.json', 'summary.json', 'summary.md']:
@@ -51,6 +186,7 @@ def main():
         shutil.copy2(SOURCE / name, WORK / name)
     config_path = os.path.relpath(REPO / 'src/vitest/config', WORK).replace(os.sep, '/')
     config = (SOURCE / 'bwt.config.ts').read_text().replace('"../../src/vitest/config"', json.dumps(config_path))
+    config = config.replace('defineConfig({', 'defineConfig({\n  viewport: { width: 414, height: 896 },')
     (WORK / 'bwt.config.ts').write_text(config)
     (WORK / 'package.json').write_text(json.dumps({
         'private': True, 'type': 'module',
@@ -98,7 +234,16 @@ def main():
         'node': subprocess.check_output(['node', '--version'], text=True).strip(),
         'vitest': '5.0.3', 'playwright': '1.56.1',
         'test_sha256': {name: hashlib.sha256((SOURCE / f'test/{name}.test.ts').read_bytes()).hexdigest() for name in FILES},
-        'measurement': 'Fresh processes, sequential runners, rotated order, wall time including startup/exit. Repeated fixtures; memory not measured.',
+        'measurement': 'Fresh processes, sequential runners, rotated order, wall time including startup/exit. Repeated fixtures. Memory uses separate runs when enabled.',
+        'runner_settings': {
+            'bun': {'parallel': args.workers, 'isolate': False, 'browser_document_per_file': True},
+            'vitest': {'maxWorkers': args.workers, 'fileParallelism': True, 'browser_isolate': True},
+            'viewport': {'width': 414, 'height': 896},
+        },
+        'commands': commands,
+        'memory': {'enabled': args.memory, 'metric': 'peak process-tree PSS', 'unit': 'MiB',
+                   'sample_interval_ms': SAMPLE_INTERVAL * 1000, 'separate_runs': True,
+                   'scope': 'Runner, workers, servers and browser processes, including reparented processes identified by a unique inherited run marker. Sampler excluded.'},
     }
     if chrome:
         metadata['chromium_executable'] = str(chrome)
@@ -109,52 +254,58 @@ def main():
     (WORK / 'metadata.json').write_text(json.dumps(metadata, indent=2))
     runners = list(commands)
     rows = []
-    for iteration in range(args.runs + 1):
-        order = runners[iteration % len(runners):] + runners[:iteration % len(runners)]
-        for runner in order:
-            env['BWT_BACKEND'] = 'webkit' if runner == 'webkit' else 'chrome'
-            env['BUN_CHROME_PATH'] = str(chrome_shell if runner.endswith('-shell') else chrome or chrome_shell)
-            start = time.perf_counter()
-            try:
-                result = subprocess.run(commands[runner], cwd=REPO, env=env, capture_output=True, text=True, timeout=180)
-            except subprocess.TimeoutExpired as error:
-                output = b''.join(part.encode() if isinstance(part, str) else part or b'' for part in [error.stdout, error.stderr])
-                (WORK / f'{runner}-{iteration}.log').write_bytes(output + b'\nBenchmark timed out after 180 seconds.\n')
-                raise
-            elapsed = time.perf_counter() - start
-            output = result.stdout + result.stderr
-            (WORK / f'{runner}-{iteration}.log').write_text(output)
-            tests, files = 40 * args.groups, len(paths)
-            if runner.startswith('vitest'):
-                passed = bool(re.search(rf'Tests\s+{tests} passed \({tests}\)', output) and re.search(rf'Test Files\s+{files} passed \({files}\)', output))
-            else:
-                passed = bool(re.search(rf'\n\s*{tests} pass\b', output) and re.search(r'\n\s*0 fail\b', output) and f'across {files} files' in output)
-            row = dict(runner=runner, iteration=iteration, seconds=elapsed, ok=result.returncode == 0 and passed)
-            rows.append(row)
-            (WORK / 'results.json').write_text(json.dumps(rows, indent=2))
-            print(json.dumps(row), flush=True)
-            if not row['ok']:
-                raise RuntimeError(output[-6000:])
-    medians = {runner: statistics.median(r['seconds'] for r in rows if r['runner'] == runner and r['iteration'] > 0) for runner in runners}
-    summary = {'medians': medians}
-    if chrome:
-        summary['chrome_time_reduction_vs_vitest_percent'] = 100 * (1 - medians['chrome'] / medians['vitest'])
-    if chrome_shell:
-        summary['shell_time_reduction_vs_vitest_percent'] = 100 * (1 - medians['chrome-shell'] / medians['vitest-shell'])
+    for phase in (['timing', 'memory'] if args.memory else ['timing']):
+        for iteration in range(args.runs + 1):
+            order = runners[iteration % len(runners):] + runners[:iteration % len(runners)]
+            for runner in order:
+                env['BWT_BACKEND'] = 'webkit' if runner == 'webkit' else 'chrome'
+                env['BUN_CHROME_PATH'] = str(chrome_shell if runner.endswith('-shell') else chrome or chrome_shell)
+                log_path = WORK / f'{runner}-{phase}-{iteration}.log'
+                code, elapsed, memory_stats = run_case(commands[runner], env, log_path, memory=phase == 'memory')
+                output = log_path.read_text()
+                tests, files = 40 * args.groups, len(paths)
+                if runner.startswith('vitest'):
+                    passed = bool(re.search(rf'Tests\s+{tests} passed \({tests}\)', output) and re.search(rf'Test Files\s+{files} passed \({files}\)', output))
+                else:
+                    passed = bool(re.search(rf'\n\s*{tests} pass\b', output) and re.search(r'\n\s*0 fail\b', output) and f'across {files} files' in output)
+                row = dict(runner=runner, phase=phase, iteration=iteration, seconds=elapsed, ok=code == 0 and passed, **memory_stats)
+                rows.append(row)
+                (WORK / 'results.json').write_text(json.dumps(rows, indent=2))
+                print(json.dumps(row), flush=True)
+                if not row['ok']:
+                    raise RuntimeError(output[-6000:])
+    medians = {runner: statistics.median(r['seconds'] for r in rows if r['runner'] == runner and r['iteration'] > 0 and r['phase'] == 'timing') for runner in runners}
+    memory_medians = {runner: statistics.median(r['peak_pss_mib'] for r in rows if r['runner'] == runner and r['iteration'] > 0 and r['phase'] == 'memory') for runner in runners} if args.memory else {}
+    summary = {'medians': medians, 'median_peak_pss_mib': memory_medians}
+    for browser, bun_runner, vitest_runner in [('chrome', 'chrome', 'vitest'), ('shell', 'chrome-shell', 'vitest-shell')]:
+        if bun_runner in medians:
+            summary[f'{browser}_time_reduction_vs_vitest_percent'] = 100 * (1 - medians[bun_runner] / medians[vitest_runner])
+            if memory_medians:
+                summary[f'{browser}_memory_reduction_vs_vitest_percent'] = 100 * (1 - memory_medians[bun_runner] / memory_medians[vitest_runner])
     (WORK / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     report = [
         '## Browser benchmark', '',
         f'{len(paths)} files / {40 * args.groups} tests / {args.workers} workers. '
-        f'One warmup, median of {args.runs} measured runs; startup and exit included.', '',
-        '| Runner | Median (seconds) |', '| --- | ---: |',
-        *[f'| {runner} | {seconds:.3f} |' for runner, seconds in medians.items()], '',
+        f'One warmup per phase, median of {args.runs} measured runs; startup and exit included.', '',
+        f'Bun: `--parallel={args.workers} --no-isolate`. Vitest: `maxWorkers: {args.workers}`, '
+        '`fileParallelism: true`, `browser.isolate: true`. Both create a fresh browser document per file; '
+        "Bun's flag controls host isolation, not browser isolation.", '',
+        '| Runner | Median time (s) | Median peak PSS (MiB) |', '| --- | ---: | ---: |',
+        *[f'| {runner} | {seconds:.3f} | {format(memory_medians[runner], ".1f") if runner in memory_medians else "not measured"} |' for runner, seconds in medians.items()], '',
     ]
     for browser in ['chrome', 'shell']:
-        key = f'{browser}_time_reduction_vs_vitest_percent'
-        if key in summary:
-            report.append(f'{browser}: bun-webview-test time reduction vs Vitest: {summary[key]:.1f}% (negative means slower).')
-    report += ['', 'Both runners use the same browser executable for each pair. '
-               'Hosted-runner timings vary; these results are informational, not a performance gate. Memory is not measured.', '']
+        for metric in ['time', 'memory']:
+            key = f'{browser}_{metric}_reduction_vs_vitest_percent'
+            if key in summary:
+                report.append(f'{browser}: bun-webview-test {metric} reduction vs Vitest: {summary[key]:.1f}% (negative means higher cost).')
+    if args.memory:
+        report += ['', 'Memory is sampled in separate executions at a target interval of 50 ms, so sampling does not affect the timing column. '
+                   'PSS includes the runner, workers, servers and browser processes (including reparented children); shared pages are proportionally counted. '
+                   'Each sample sums live processes; the column is the median of per-run peaks, not a sum of individual process peaks. '
+                   'Sampling may miss brief peaks. The Python sampler is excluded.']
+    report += ['', 'Both runners use the same browser executable for each pair, workload, viewport and worker limit. '
+               'Browser launch flags, process counts and storage/context lifetimes remain implementation-specific. '
+               'Hosted-runner results vary; these results are informational, not a performance gate.', '']
     (WORK / 'summary.md').write_text('\n'.join(report))
     print(json.dumps(summary, indent=2))
 

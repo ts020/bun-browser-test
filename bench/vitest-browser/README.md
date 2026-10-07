@@ -22,7 +22,7 @@ python3 bench.py 5 suite/bwt-par   # 一部だけ（名前の前方一致）
 ## File-count scaling
 
 `scaling.py` は `basic`・`dom`・`env`・`findElement`・`utils` の既存テストを内容を変えずに複製します。
-既定は20組、100ファイル・800テスト（スクリーンショット100回）。800種類のテストではありません。
+既定は20組、100ファイル・800テスト（スクリーンショット100回）、2ワーカーです。800種類のテストではありません。
 1つのプロジェクト設定を共有し、両ランナーが同じファイルと Chromium バイナリを実行します。
 
 ```sh
@@ -72,18 +72,55 @@ GitHub Actions の **Browser benchmark → Run workflow** から手動実行で�
 - 本パッケージの CLI で取得した同じ Headless Shell を両ランナーに明示指定します。ブラウザ導入や npm install は計測区間に含めません。
 - 100ファイル・800テスト・スクリーンショット100回、2ワーカー、ウォームアップ1回＋計測3回。ランナーを順番に動かし、順序は回ごとに交代します。
 - 各回の終了コードだけでなく成功テスト数・ファイル数も確認します。失敗時はジョブも失敗し、残っているログを保存します。
-- Summary に中央値と Vitest に対する実行時間の短縮率を表示します。負の短縮率は bun-webview-test のほうが遅いことを表します。
+- Summary に実行時間の中央値・各回のピークPSSの中央値（MiB）と、Vitestに対する時間・メモリの削減率を表示します。負の削減率は bun-webview-test のコストが高いことを表します。
 - `benchmark-results-*` artifact に結果・メタデータ・比較用依存の `package-lock.json`・ログを30日保存します。
 
 ホスト型ランナーでは実行ごとに負荷や CPU 性能が変わるため、速度の閾値は設けていません。
 macOS の4ワーカーの掲載値と CI の2ワーカーの値は直接比較できません。
-この CI は時間のみを測定します。メモリは従来の Linux 用 `bench.py` の計測であり、今回の Shell 構成の値とは分けて扱います。
+時間計測の後に、同じ条件で両ランナーのメモリを別途計測します。以前の時間のみの結果や `bench.py` の直列スイートとは分けて扱います。
 
-同じ設定をローカルで動かす例（先に `bun src/cli.ts install` を実行）：
+同じ設定をLinuxで動かす例（先に `bun src/cli.ts install` を実行）：
 
 ```sh
-python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 3
+python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 3 --memory
 ```
+
+### 比較条件とメモリ計測
+
+| 条件 | bun-webview-test | Vitest Browser Mode |
+| --- | --- | --- |
+| 並列実行 | `--parallel=2 --no-isolate` | `maxWorkers: 2`, `fileParallelism: true` |
+| ブラウザ内の分離 | ファイルごとに新しいdocument | `browser.isolate: true`、ファイルごとに新しいiframe |
+| ブラウザ・テスト・画面サイズ | 同じHeadless Shell実行ファイル・同じ生成ファイル・414×896 | 同左 |
+| ウォームアップ・反復 | 時間・メモリそれぞれ1回＋計測3回 | 同左 |
+
+Bunの `--no-isolate` はホスト側の状態を維持する設定です。本パッケージではブラウザのDOM・グローバル・モジュールはファイルごとに作り直します。
+Vitestの `browser.isolate: false` はブラウザ内の状態も共有するため、比較には使いません。
+起動引数、ブラウザプロセス数、storage/contextの寿命は各実装に従い、そのコストも計測対象です。
+
+`--memory` はLinux専用です。`/proc/<pid>/smaps_rollup` のPSSを目標50ms間隔で集計します。
+ランナー・ワーカー・サーバー・ブラウザを含め、共有メモリは利用割合に応じて数えます。
+専用セッションと実行ごとの環境マーカーで、親から切り離されたChromeも追跡します。無関係なプロセスとPythonの計測処理は含みません。
+各時点の合計の最大値をその回のピークとし、ウォームアップを除いた3回のピークの中央値を比較します。
+個々のプロセスの最大値を足した値ではなく、短いピークはサンプリングで見逃す可能性があります。
+
+時間計測中にはメモリをサンプリングしません。メモリ計測用の実行は `phase: "memory"` として保存し、その実行時間は速度の中央値に混ぜません。
+どちらのフェーズでも成功テスト数とファイル数を確認し、終了後に子プロセスが残れば停止して計測を失敗にします。
+PSSが読めない場合も0として処理せず失敗にします。Linux以外では `--memory` を省略すると時間のみを測れます。
+
+`metadata.json` には実行コマンド・分離設定・ワーカー数・計測方法を保存します。
+`results.json` のメモリ行には `peak_pss_mib`・`memory_samples`・`peak_process_count` を、
+`summary.json` には `median_peak_pss_mib` と削減率を記録します。
+
+### Recorded Linux CI result
+
+[PR #6の実行](https://github.com/ts020/bun-browser-test/actions/runs/37550092193)では、両者に同じChrome Headless Shell 145.0.7632.6を使用しました。
+Ubuntu 24.04 x64、Bun 1.4.2、Node 24.21.0、Vitest 5.0.3、Playwright 1.56.1、2ワーカーで、100ファイル・800テスト・スクリーンショット100回。
+ウォームアップ1回後の3回の中央値は、bun-webview-test **10.3078秒**、Vitest **12.9941秒**で、実行時間は**20.7%短縮**しました。
+導入時間を除き、プロセスの起動から終了までを含みます。メモリは未計測です。
+
+[保存した生の計測値・メタデータ](scaling-results-linux-ci.json)には、ウォームアップを含む全8回の結果とPRのテスト用merge commitを記録しています。
+GitHubのartifact保存期間が過ぎても、このJSONで掲載値を確認できます。
 
 ## Installation size
 
@@ -112,3 +149,37 @@ PY
 
 [ブラウザ ZIP 容量](browser-download-sizes.json)は、記載された公式 URL へ HTTPS HEAD で問い合わせた `Content-Length` です。
 同じ種類・バージョン・プラットフォームのバイナリを選べば、どちらのランナーでもブラウザ本体の容量は同じです。
+
+## Earlier Linux measurements
+
+以前の計測では、同じ4コアのLinuxマシン・同じ通常版Chromiumの実行ファイルを使い、
+移植した `test/browser/test`（21ファイル・127テスト）をVitest 5.0.3 Browser Mode（`@vitest/browser-playwright`）と比較しました。
+プロセスの起動から終了までの実時間を測った、warm実行5回の中央値です。計測スクリプトは [`bench.py`](bench.py) です。
+
+| 実行方法 | 時間 |
+| --- | --- |
+| bun-webview-test, `bun test --parallel --no-isolate` | **5.0s** |
+| bun-webview-test, `bun test --parallel` | 5.5s |
+| bun-webview-test, `bun test`（直列） | 7.5s |
+| Vitest（既定、ファイルを並列実行） | 6.3s |
+| Vitest (`--no-file-parallelism`) | 7.6s |
+
+### Earlier memory measurements
+
+以下も以前のLinux計測で、同じ通常版Chromiumを使った結果です。
+最大メモリはChromiumを含むプロセスツリーのPSSを50msごとに合計した最大値で、共有ページは利用割合に応じて数えています。
+単位はMiBです（スクリプトの表記はMB）。起動時の比較は単一テストを使い、cold実行の前には `.vite` / `.bwt` キャッシュを削除しています。
+
+| ランナー | 時間（cold / warm） | 最大メモリ |
+| --- | --- | --- |
+| bun-webview-test | 0.53s / 0.53s | 329 MiB |
+| Vitest | 2.42s / 2.00s | 788 / 567 MiB (cold / warm) |
+
+| 直列スイート、21ファイル・127テスト | 最大メモリ（PSS） |
+| --- | ---: |
+| bun-webview-test | 382 MiB |
+| Vitest | 770 MiB |
+
+このワークロードでは、`--parallel --no-isolate` のスイート実行時間はVitest既定比で約20%短縮しました。
+単一テストの起動から終了までの時間は約75%以上短縮し、直列スイートの最大メモリは約50%少ない結果でした。
+現在のHeadless Shell構成・macOSのスケーリング比較・WKWebViewのメモリは未計測です。ワーカー数やテスト内容によって使用量は変わります。

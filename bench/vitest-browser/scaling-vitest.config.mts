@@ -16,10 +16,14 @@ export default defineConfig({
   test: {
     include: ['g*/test/*.test.ts'],
     env: { CUSTOM_ENV: 'foo' },
-    maxWorkers: Number(process.env.BENCH_WORKERS ?? 4),
+    maxWorkers: Number(process.env.BENCH_WORKERS ?? 2),
+    fileParallelism: true,
     browser: {
       enabled: true,
       headless: true,
+      // Bun's --no-isolate preserves host state, but its browser document is
+      // still recreated per file. Match that boundary, not the CLI flag name.
+      isolate: true,
       provider: playwright({ launchOptions: { executablePath: process.env.BUN_CHROME_PATH } }),
       instances: [{ browser: 'chromium' }],
       viewport: { width: 414, height: 896 },

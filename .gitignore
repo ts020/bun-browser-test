@@ -4,3 +4,4 @@ node_modules/
 .vitest/
 dist/
 bench/vitest-browser/.scaling/
+__pycache__/
