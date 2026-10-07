@@ -1,5 +1,11 @@
 # bun-webview-test
 
+## 0.3.1
+
+### Patch Changes
+
+- [#12](https://github.com/ts020/bun-browser-test/pull/12) [`604be1d`](https://github.com/ts020/bun-browser-test/commit/604be1d4e991004d16957b0b7e74efdd1ac80776) Thanks [@ts020](https://github.com/ts020)! - Wait for the browser to consume its completion response before closing or reusing its page. Fail and close the page directly if completion remains pending for 30 seconds, and preserve completion RPC errors.
+
 ## 0.3.0
 
 ### Minor Changes
