@@ -1,5 +1,11 @@
 # bun-webview-test
 
+## 0.3.0
+
+### Minor Changes
+
+- [#10](https://github.com/ts020/bun-browser-test/pull/10) [`dac0a47`](https://github.com/ts020/bun-browser-test/commit/dac0a474e653ceb95851fb89346e146b7ceb6392) Thanks [@ts020](https://github.com/ts020)! - Run Vitest-compatible browser tests in Firefox directly through WebDriver BiDi, without Playwright or geckodriver. Select the engine with BWT_BACKEND or backend configuration, isolate each test file in a fresh browser, and report unsupported CDP and raw WebView operations explicitly.
+
 ## 0.2.0
 
 ### Minor Changes
