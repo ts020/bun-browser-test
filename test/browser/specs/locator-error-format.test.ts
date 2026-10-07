@@ -32,7 +32,7 @@ const HTML = `<body>
 
 async function notFoundError(errorFormat?: string) {
   const { stderr } = await runBrowserTests("locator-error-format", {
-    config: { screenshotFailures: false, ...(errorFormat ? { locators: { errorFormat } } : {}) },
+    config: { forwardConsole: false, screenshotFailures: false, ...(errorFormat ? { locators: { errorFormat } } : {}) },
   });
   const error = errorOf(stderr, "not found");
   // 先頭の "VitestBrowserElementError: " と、末尾のスタックを除いた本文

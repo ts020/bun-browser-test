@@ -9,6 +9,7 @@ import { selectorEngine } from "@vitest/browser/locators";
 import { asLocator } from "ivya";
 import { getAriaDisabled, getAriaRole, isElementVisible } from "ivya/utils";
 import { rpc } from "./rpc";
+import { boot } from "./boot";
 import { getBrowserState, getWorkerState } from "./state";
 
 export interface SerializedLocator {
@@ -385,6 +386,11 @@ export async function dragAndDrop(
   target: SerializedLocator,
   options: { timeout?: number; force?: boolean; sourcePosition?: { x: number; y: number }; targetPosition?: { x: number; y: number }; steps?: number } = {},
 ) {
+  if (boot.backend === "firefox") {
+    // Gecko's WebDriver mouse-up currently ends a drag without delivering drop.
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1515879
+    throw new Error("HTML5 drag and drop is not supported by the firefox WebDriver BiDi backend. Use the chrome backend.");
+  }
   const from = await pointerTarget("locator.dragTo", source, { ...options, position: options.sourcePosition }, false);
   if (!from) return;
   await input([["move", from.x, from.y], ["mouseDown", "left"]]);

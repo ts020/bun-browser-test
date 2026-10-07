@@ -1,3 +1,4 @@
+import type { BrowserBackend } from "../config";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, parse, resolve, sep } from "node:path";
 
@@ -6,11 +7,17 @@ export type BrowserCommand = (context: BrowserCommandContext, ...args: any[]) =>
 
 export interface BrowserCommandContext {
   testPath: string | undefined;
-  /** 生の Bun.WebView */
+  /** 生の Bun.WebView。Firefox でアクセスすると非対応エラー。 */
   view: InstanceType<typeof Bun.WebView>;
 }
 
 export interface BrowserModeConfig {
+  /** Browser engine. BWT_BACKEND overrides this setting. */
+  backend: BrowserBackend;
+  /** Regular Firefox executable (WebDriver BiDi). BWT_FIREFOX_PATH overrides this setting. */
+  firefoxPath?: string;
+  /** Additional Firefox launch arguments. */
+  firefoxArgs: string[];
   /**
    * ブラウザで動かすテストファイル。既定は「`vitest/browser` か `@vitest/browser/context` を import している」
    * または「ファイル名が `.browser.test.*` / `.browser.spec.*`」のファイル。
@@ -43,7 +50,7 @@ export interface BrowserModeConfig {
   expect: { requireAssertions?: boolean; poll?: { timeout?: number; interval?: number } };
   /** `server.provider` が返す名前。テストの分岐を Playwright と同じにするため既定は "playwright" */
   provider: string;
-  /** `server.browser` が返す名前。既定は chrome バックエンドなら "chromium"、webkit なら "webkit" */
+  /** `server.browser` が返す名前。既定は chrome なら "chromium"、それ以外はバックエンド名 */
   browserName?: string;
   /** スナップショットの更新。既定は `bun test -u` / `--update-snapshots` のときだけ "all"、それ以外は "new" */
   updateSnapshot: "all" | "new" | "none";
@@ -78,7 +85,7 @@ export interface BrowserModeConfig {
   screenshotFailures: boolean;
   /** vitest の `browser.testerHtmlPath`。テストを動かすページの HTML（root からの相対パス） */
   testerHtmlPath?: string;
-  /** vitest の `browser.headless`。Bun.WebView は常にヘッドレス */
+  /** vitest の `browser.headless`。Firefox 以外の Bun.WebView は常にヘッドレス */
   headless: boolean;
 }
 
@@ -95,6 +102,8 @@ const isCI = !!process.env.CI;
 function defaults(): BrowserModeConfig {
   const update = process.argv.some((a) => a === "-u" || a === "--update-snapshots");
   return {
+    backend: "chrome",
+    firefoxArgs: [],
     include: (path, source) =>
       /\.browser\.(test|spec)\.[cm]?[jt]sx?$/.test(path) ||
       /from\s+['"](vitest\/browser|@vitest\/browser\/context)['"]/.test(source),

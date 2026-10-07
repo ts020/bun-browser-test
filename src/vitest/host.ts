@@ -7,7 +7,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { buildRuntime, importMap } from "./bundler";
 import { chromeBackend } from "../chrome";
-import { detectChromePath } from "../config";
+import { detectChromePath, resolveBackend, type BrowserBackend } from "../config";
+import { FirefoxView } from "./firefox";
 import { assertFileAccess, type BrowserModeConfig, getBrowserModeConfig, loadEnvFiles, resolveFileConfig, serializeConfig } from "./config";
 import { CDP_EVENTS } from "./cdp-events";
 import { decode, encode } from "./codec";
@@ -193,6 +194,10 @@ function toError(err: SerializedError): Error {
   // ページ内のスタックはソースマップで元のファイルに戻してある。ランタイム（/__bwt/）の行は省く
   const frames = (err.stack ?? err.stackStr ?? "")
     .split("\n")
+    .map((l) => {
+      const firefox = /^(.*?)@(.+:\d+:\d+)$/.exec(l);
+      return firefox ? `    at ${firefox[1] || "<anonymous>"} (${firefox[2]})` : l;
+    })
     .filter((l) => /^\s+at /.test(l) && !l.includes("/__bwt/rt/") && !l.includes("(<anonymous>)"));
   if (frames.length) message += `\n\n${frames.map((f) => `  ${f.trim()}`).join("\n")}`;
   // Bun は cause を表示しないので、メッセージに足す
@@ -261,9 +266,9 @@ function pageConsole(type: string, ...args: unknown[]) {
 class FileSession {
   readonly id = `f${++seq}`;
   config: BrowserModeConfig;
-  view!: WebView;
-  input!: Input;
-  backend: "chrome" | "webkit";
+  view!: WebView | FirefoxView;
+  input!: Input | FirefoxView["input"];
+  backend: BrowserBackend = "chrome";
   devServer!: DevServer;
   readonly collected = deferred<SerializedTask[]>();
   readonly finished = deferred<void>();
@@ -278,12 +283,17 @@ class FileSession {
 
   constructor(readonly filepath: string) {
     this.config = getBrowserModeConfig();
-    const env = process.env.BWT_BACKEND;
-    this.backend = env === "webkit" ? "webkit" : "chrome";
   }
 
   get browserName() {
-    return this.config.browserName ?? (this.backend === "webkit" ? "webkit" : "chromium");
+    return this.config.browserName ?? (this.backend === "chrome" ? "chromium" : this.backend);
+  }
+
+  private get webView(): WebView {
+    if (this.view instanceof FirefoxView) {
+      throw new Error("CDP and raw Bun.WebView access are not supported by the firefox backend. Use the chrome backend for these operations.");
+    }
+    return this.view;
   }
 
   /**
@@ -413,6 +423,7 @@ ${scripts}
 
   async start() {
     this.config = await resolveFileConfig(this.filepath);
+    this.backend = resolveBackend(this.config.backend);
     const srv = getServer();
     this.devServer = getDevServer(this.config);
     const htmlModules = this.config.testerHtmlPath ? await this.loadTesterHtml() : [];
@@ -420,26 +431,40 @@ ${scripts}
     await Promise.all([buildRuntime(), this.devServer.prepare([this.filepath, ...this.setupFilePaths(), ...htmlModules])]);
     sessions.set(this.id, this);
 
-    const backend = this.backend === "webkit" ? "webkit" : await chromeBackend(chromePath(), process.getuid?.() === 0 ? ["--no-sandbox"] : []);
-    this.chromeKey = JSON.stringify([backend, this.config.forwardConsole, this.config.server.headers]);
-    const idle = idleChrome;
-    idleChrome = undefined;
-    const reused = this.backend === "chrome" && idle?.key === this.chromeKey;
-    if (!reused) idle?.view.close();
-    this.view = reused ? idle.view : new Bun.WebView({
-      backend,
-      width: this.config.viewport.width,
-      height: this.config.viewport.height,
-      console: this.config.forwardConsole ? pageConsole : undefined,
-    });
-    if (!reused) serializeViewCalls(this.view);
-    this.input = new Input(this.view, this.backend);
+    let reused = false;
+    if (this.backend === "firefox") {
+      idleChrome?.view.close();
+      idleChrome = undefined;
+      const view = await FirefoxView.start(this.config);
+      this.view = view;
+      this.input = view.input;
+      void view.disconnected.then(error => {
+        this.unhandled.push({ message: error.message });
+        this.finished.resolve();
+      });
+    } else {
+      const backend = this.backend === "webkit" ? "webkit" : await chromeBackend(chromePath(), process.getuid?.() === 0 ? ["--no-sandbox"] : []);
+      this.chromeKey = JSON.stringify([backend, this.config.forwardConsole, this.config.server.headers]);
+      const idle = idleChrome;
+      idleChrome = undefined;
+      reused = this.backend === "chrome" && idle?.key === this.chromeKey;
+      if (!reused) idle?.view.close();
+      const view = reused ? idle!.view : new Bun.WebView({
+        backend,
+        width: this.config.viewport.width,
+        height: this.config.viewport.height,
+        console: this.config.forwardConsole ? pageConsole : undefined,
+      });
+      this.view = view;
+      if (!reused) serializeViewCalls(view);
+      this.input = new Input(view, this.backend);
+    }
     if (this.backend === "chrome") {
       // 初回だけ CDP セッションを作る。再利用時に空白ページへ移る必要はない。
       if (!reused) await this.view.navigate("about:blank");
       await this.setViewport(this.config.viewport.width, this.config.viewport.height);
       // ウィンドウがフォーカスされていなくても focus / blur イベントが起きるようにする
-      await this.view.cdp("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
+      await this.webView.cdp("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
     }
     if (reused) {
       // 前のファイルの終了時に読み直した、新しいオーケストレーターにテスターを入れる。
@@ -470,9 +495,10 @@ ${scripts}
   private cdpQueue: Promise<unknown> = Promise.resolve();
 
   private listenCdp(event: string) {
+    const view = this.webView;
     if (this.cdpListening.has(event)) return;
     this.cdpListening.add(event);
-    this.view.addEventListener(event, ((e: MessageEvent) => {
+    view.addEventListener(event, ((e: MessageEvent) => {
       const code = `(__vitest_browser_runner__.cdp.emit(${JSON.stringify(event)}, ${JSON.stringify(e.data)}), 1)`;
       // evaluate は同時に 1 つしか動かせないので順番に流す
       this.cdpQueue = this.cdpQueue.then(() => this.view.evaluate(code)).catch(() => {});
@@ -482,7 +508,7 @@ ${scripts}
   /** Playwright の page.setViewportSize と同じく、ウィンドウではなくページの表示領域の大きさを決める。 */
   async setViewport(width: number, height: number) {
     if (this.backend === "chrome") {
-      await this.view.cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
+      await this.webView.cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
     } else {
       await this.view.resize(width, height);
     }
@@ -495,10 +521,10 @@ ${scripts}
         // タブ単位の状態も新規タブと同じに戻す。cookie / localStorage は従来どおり origin 単位。
         await this.view.navigate(`${getServer().url.origin}/__bwt/page/${this.id}?idle`);
         await this.view.evaluate('(sessionStorage.clear(), window.name = "", true)');
-        await this.view.cdp("Page.resetNavigationHistory");
-        await this.view.cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: 0, y: 0 });
+        await this.webView.cdp("Page.resetNavigationHistory");
+        await this.webView.cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: 0, y: 0 });
         idleChrome?.view.close();
-        idleChrome = { key: this.chromeKey, view: this.view };
+        idleChrome = { key: this.chromeKey, view: this.webView };
         sessions.delete(this.id);
         return;
       } catch {
@@ -507,7 +533,7 @@ ${scripts}
     }
     sessions.delete(this.id);
     try {
-      this.view?.close();
+      await this.view?.close();
     } catch {}
   }
 
@@ -552,7 +578,7 @@ ${scripts}
         return;
       case "cdp": {
         this.reusable = false;
-        const result = await this.view.cdp(args[0], args[1] ?? {});
+        const result = await this.webView.cdp(args[0], args[1] ?? {});
         // ページが on() を登録するより先にイベントが来ても取りこぼさないよう、enable したドメインのイベントは全部流す
         const domain = /^(\w+)\.enable$/.exec(args[0])?.[1];
         for (const event of (domain && CDP_EVENTS[domain]) || []) this.listenCdp(`${domain}.${event}`);
@@ -660,6 +686,7 @@ ${scripts}
   }
 
   private async capture(options: { clip?: Clip; type?: string; quality?: number; omitBackground?: boolean; fullPage?: boolean }) {
+    if (this.view instanceof FirefoxView) return this.view.capture(options);
     if (this.backend !== "chrome") return this.view.screenshot({ encoding: "base64" }) as Promise<string>;
     const params: Record<string, unknown> = {
       format: options.type === "jpeg" ? "jpeg" : "png",
@@ -668,17 +695,17 @@ ${scripts}
     if (options.quality != null && options.type === "jpeg") params.quality = options.quality;
     if (options.clip) params.clip = { ...options.clip, scale: 1 };
     else if (options.fullPage) {
-      const { cssContentSize } = await this.view.cdp<{ cssContentSize: { width: number; height: number } }>("Page.getLayoutMetrics");
+      const { cssContentSize } = await this.webView.cdp<{ cssContentSize: { width: number; height: number } }>("Page.getLayoutMetrics");
       params.clip = { x: 0, y: 0, width: cssContentSize.width, height: cssContentSize.height, scale: 1 };
     }
     if (options.omitBackground) {
-      await this.view.cdp("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
+      await this.webView.cdp("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
     }
     try {
-      const res = await this.view.cdp<{ data: string }>("Page.captureScreenshot", params);
+      const res = await this.webView.cdp<{ data: string }>("Page.captureScreenshot", params);
       return res.data;
     } finally {
-      if (options.omitBackground) await this.view.cdp("Emulation.setDefaultBackgroundColorOverride", {});
+      if (options.omitBackground) await this.webView.cdp("Emulation.setDefaultBackgroundColorOverride", {});
     }
   }
 
@@ -771,7 +798,7 @@ ${scripts}
       get view() {
         // 任意の CDP 設定や初期化スクリプトなどを次のファイルに持ち越さない。
         session.reusable = false;
-        return session.view;
+        return session.webView;
       },
     }, ...args);
   }

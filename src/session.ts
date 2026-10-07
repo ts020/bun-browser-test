@@ -23,6 +23,9 @@ export class BrowserSession {
   }
 
   static async start(config = getConfig()): Promise<BrowserSession> {
+    if (config.backend === "firefox") {
+      throw new Error("bun-webview-test: Firefox supports the Vitest-compatible API only. Use vitest/browser with bun-webview-test/vitest-preload.");
+    }
     const backend =
       config.backend === "webkit"
         ? ("webkit" as const)
