@@ -81,13 +81,13 @@ Bun **1.3.14** 以降と Chrome Headless Shell が必要です（[必要なも�
 
 ### 速度
 
-記録した **Linux CIでは10.31秒、Vitestは12.99秒で、実行時間が20.7%短縮**されました。
+記録した **Linux CIでは9.49秒、Vitestは11.10秒で、実行時間が14.5%短縮**されました。
 両方とも **同じ Chrome Headless Shell 145.0.7632.6 の実行ファイル**を使っています。
 
 | Linux CI・Headless Shell | 実行時間の中央値 |
 | --- | ---: |
-| bun-webview-test | **10.31秒** |
-| Vitest Browser Mode + Playwright | 12.99秒 |
+| bun-webview-test | **9.49秒** |
+| Vitest Browser Mode + Playwright | 11.10秒 |
 
 Ubuntu 24.04 x64、Bun 1.4.2、Node 24.21.0、Vitest 5.0.3、Playwright 1.56.1、各2ワーカーで計測しました。
 既存の5ファイルを20組複製した100ファイル・800テスト・スクリーンショット100回のワークロードです。
@@ -95,8 +95,8 @@ Ubuntu 24.04 x64、Bun 1.4.2、Node 24.21.0、Vitest 5.0.3、Playwright 1.56.1�
 bun-webview-test は `--parallel=2 --no-isolate` で実行しています。
 異なる800ケースではなく、ファイル数を増やした場合の計測です。CIの負荷やテスト内容によって結果は変わります。
 
-[GitHub Actionsの実行結果](https://github.com/ts020/bun-browser-test/actions/runs/37550092193) ·
-[保存した計測値・実行環境](bench/vitest-browser/scaling-results-linux-ci.json) ·
+[GitHub Actionsの実行結果](https://github.com/ts020/bun-browser-test/actions/runs/37551576464) ·
+[保存した計測値・実行環境](bench/vitest-browser/scaling-results-linux-ci-memory.json) ·
 [再現手順](bench/vitest-browser/README.md#ci-benchmark)
 
 <details>
@@ -167,17 +167,21 @@ macOS arm64 の独立したプロジェクトに Bun 1.4.2 で導入したとこ
 
 ### メモリ効率
 
-以前のLinux計測では、両者に **同じ通常版Chromium** を使い、21ファイル・127テストを直列実行しました。
-Chromiumを含むプロセスツリーのPSSを50msごとに合計した最大値です。単位はMiBです。
+同じLinux CIジョブで、同じワークロード・双方2ワーカーのまま別途メモリを計測した結果、
+**674.3 MiB 対 Vitestの885.5 MiBで、ピークPSSが23.9%少ない**結果でした。
 
-| ランナー | 最大メモリ |
+| ランナー | ピークPSSの中央値 |
 | --- | ---: |
-| bun-webview-test | 382 MiB |
-| Vitest | 770 MiB |
+| bun-webview-test | **674.3 MiB** |
+| Vitest Browser Mode + Playwright | 885.5 MiB |
 
-このワークロードでは約50%少ない結果でした。**上記に掲載したHeadless ShellのCI結果は、時間のみの計測です。**
-macOS・WKWebViewの比較もメモリは未計測です。速度とメモリの値は、異なる構成での計測として扱ってください。
-[以前のスイート・起動時の計測](bench/vitest-browser/README.md#earlier-linux-measurements)を参照してください。
+ホスト側のランナー・ワーカー・サーバー・ブラウザを含め、共有メモリは利用割合に応じて数えています。
+ウォームアップ1回後の3回について、目標50ms間隔で集計した各回のピークの中央値です。
+速度計測とは別に実行するため、上の実行時間にはサンプリング負荷を含みません。短いピークは見逃す可能性があります。
+[生の計測値と実行環境](bench/vitest-browser/scaling-results-linux-ci-memory.json)も保存しています。
+
+macOS・WKWebViewの比較はメモリ未計測です。通常版Chromiumを使った過去の別ワークロードの値は、
+[以前のLinux計測](bench/vitest-browser/README.md#earlier-linux-measurements)にまとめています。
 
 ## 必要なもの
 

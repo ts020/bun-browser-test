@@ -1,0 +1,320 @@
+{
+  "run_url": "https://github.com/ts020/bun-browser-test/actions/runs/37551576464",
+  "run_id": 37551576464,
+  "run_attempt": 1,
+  "runner_image": "ubuntu-24.04",
+  "metadata": {
+    "os": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "workers": 2,
+    "groups": 20,
+    "warmup_runs": 1,
+    "measured_runs": 3,
+    "cpu_count": 4,
+    "commit": "4a8b5b8f9337924fe5f7185069e96d2e04787580",
+    "bun": "1.4.2+744846f84",
+    "node": "v24.21.0",
+    "vitest": "5.0.3",
+    "playwright": "1.56.1",
+    "test_sha256": {
+      "basic": "ec0667e5ffaf4c16b434dfd8f7cd69052175cb325e3b52e04bbb370ac3051cd4",
+      "dom": "211540f22a38384b4585aa341f293dc2cef06a411820af77a711486d12c05292",
+      "env": "9b111dee4c34c8f61cc2cdd63db05a10e0bd2f5b5dd8b754aa414f19df56c478",
+      "findElement": "58731c9a74bbd00897ddecd7b2cb1054bf1eef7758dddf45b6169b068e326e9e",
+      "utils": "be609067f7b621f632c71948958362b0ae8e193afbdd78e5f61ddd8bd3c86576"
+    },
+    "measurement": "Fresh processes, sequential runners, rotated order, wall time including startup/exit. Repeated fixtures. Memory uses separate runs when enabled.",
+    "runner_settings": {
+      "bun": {
+        "parallel": 2,
+        "isolate": false,
+        "browser_document_per_file": true
+      },
+      "vitest": {
+        "maxWorkers": 2,
+        "fileParallelism": true,
+        "browser_isolate": true
+      },
+      "viewport": {
+        "width": 414,
+        "height": 896
+      }
+    },
+    "commands": {
+      "chrome-shell": [
+        "bun",
+        "test",
+        "--parallel=2",
+        "--no-isolate",
+        "--path-ignore-patterns=__none__",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g000/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g000/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g000/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g000/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g000/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g001/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g001/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g001/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g001/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g001/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g002/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g002/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g002/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g002/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g002/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g003/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g003/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g003/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g003/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g003/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g004/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g004/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g004/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g004/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g004/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g005/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g005/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g005/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g005/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g005/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g006/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g006/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g006/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g006/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g006/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g007/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g007/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g007/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g007/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g007/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g008/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g008/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g008/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g008/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g008/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g009/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g009/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g009/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g009/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g009/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g010/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g010/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g010/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g010/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g010/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g011/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g011/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g011/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g011/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g011/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g012/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g012/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g012/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g012/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g012/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g013/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g013/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g013/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g013/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g013/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g014/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g014/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g014/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g014/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g014/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g015/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g015/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g015/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g015/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g015/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g016/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g016/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g016/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g016/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g016/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g017/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g017/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g017/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g017/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g017/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g018/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g018/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g018/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g018/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g018/test/utils.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g019/test/basic.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g019/test/dom.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g019/test/env.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g019/test/findElement.test.ts",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/g019/test/utils.test.ts"
+      ],
+      "vitest-shell": [
+        "node",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/node_modules/vitest/vitest.mjs",
+        "run",
+        "--config",
+        "/home/runner/work/bun-browser-test/bun-browser-test/bench/vitest-browser/.scaling/vitest.config.mts",
+        "--no-color"
+      ]
+    },
+    "memory": {
+      "enabled": true,
+      "metric": "peak process-tree PSS",
+      "unit": "MiB",
+      "sample_interval_ms": 50.0,
+      "separate_runs": true,
+      "scope": "Runner, workers, servers and browser processes, including reparented processes identified by a unique inherited run marker. Sampler excluded."
+    },
+    "chromium_shell_executable": "/home/runner/work/bun-browser-test/bun-browser-test/.cache/bun-webview-test/145.0.7632.6-linux64/chrome-headless-shell-linux64/chrome-headless-shell",
+    "chromium_shell": "Google Chrome for Testing 145.0.7632.6"
+  },
+  "samples": [
+    {
+      "runner": "chrome-shell",
+      "phase": "timing",
+      "iteration": 0,
+      "seconds": 10.900003220999992,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "timing",
+      "iteration": 0,
+      "seconds": 11.705565770000007,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "timing",
+      "iteration": 1,
+      "seconds": 11.355148837000002,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "timing",
+      "iteration": 1,
+      "seconds": 9.49364528999999,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "timing",
+      "iteration": 2,
+      "seconds": 9.540144561999995,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "timing",
+      "iteration": 2,
+      "seconds": 11.103583242000013,
+      "ok": true
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "timing",
+      "iteration": 3,
+      "seconds": 10.956625175999989,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "timing",
+      "iteration": 3,
+      "seconds": 9.241157817000015,
+      "ok": true
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "memory",
+      "iteration": 0,
+      "seconds": 9.79956605000001,
+      "ok": true,
+      "peak_pss_mib": 678.5322265625,
+      "memory_samples": 196,
+      "peak_process_count": 23
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "memory",
+      "iteration": 0,
+      "seconds": 11.554331204000022,
+      "ok": true,
+      "peak_pss_mib": 851.0380859375,
+      "memory_samples": 230,
+      "peak_process_count": 8
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "memory",
+      "iteration": 1,
+      "seconds": 11.608591798999981,
+      "ok": true,
+      "peak_pss_mib": 868.4892578125,
+      "memory_samples": 231,
+      "peak_process_count": 8
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "memory",
+      "iteration": 1,
+      "seconds": 9.791020396000022,
+      "ok": true,
+      "peak_pss_mib": 674.2724609375,
+      "memory_samples": 196,
+      "peak_process_count": 21
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "memory",
+      "iteration": 2,
+      "seconds": 9.799902232000022,
+      "ok": true,
+      "peak_pss_mib": 677.7021484375,
+      "memory_samples": 196,
+      "peak_process_count": 21
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "memory",
+      "iteration": 2,
+      "seconds": 11.553790381999988,
+      "ok": true,
+      "peak_pss_mib": 885.49609375,
+      "memory_samples": 230,
+      "peak_process_count": 8
+    },
+    {
+      "runner": "vitest-shell",
+      "phase": "memory",
+      "iteration": 3,
+      "seconds": 11.555384250000031,
+      "ok": true,
+      "peak_pss_mib": 894.5390625,
+      "memory_samples": 230,
+      "peak_process_count": 8
+    },
+    {
+      "runner": "chrome-shell",
+      "phase": "memory",
+      "iteration": 3,
+      "seconds": 9.691154401000006,
+      "ok": true,
+      "peak_pss_mib": 668.5556640625,
+      "memory_samples": 194,
+      "peak_process_count": 23
+    }
+  ],
+  "summary": {
+    "medians": {
+      "chrome-shell": 9.49364528999999,
+      "vitest-shell": 11.103583242000013
+    },
+    "median_peak_pss_mib": {
+      "chrome-shell": 674.2724609375,
+      "vitest-shell": 885.49609375
+    },
+    "shell_time_reduction_vs_vitest_percent": 14.499264939180456,
+    "shell_memory_reduction_vs_vitest_percent": 23.85370577051177
+  }
+}

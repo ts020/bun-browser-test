@@ -114,13 +114,21 @@ PSSが読めない場合も0として処理せず失敗にします。Linux以�
 
 ### Recorded Linux CI result
 
-[PR #6の実行](https://github.com/ts020/bun-browser-test/actions/runs/37550092193)では、両者に同じChrome Headless Shell 145.0.7632.6を使用しました。
-Ubuntu 24.04 x64、Bun 1.4.2、Node 24.21.0、Vitest 5.0.3、Playwright 1.56.1、2ワーカーで、100ファイル・800テスト・スクリーンショット100回。
-ウォームアップ1回後の3回の中央値は、bun-webview-test **10.3078秒**、Vitest **12.9941秒**で、実行時間は**20.7%短縮**しました。
-導入時間を除き、プロセスの起動から終了までを含みます。メモリは未計測です。
+[PR #7の実行](https://github.com/ts020/bun-browser-test/actions/runs/37551576464)で、上記の時間・メモリ計測を検証しました。
+Ubuntu 24.04 x64、Bun 1.4.2、Node 24.21.0、Vitest 5.0.3、Playwright 1.56.1、同じChrome Headless Shell 145.0.7632.6、双方2ワーカーです。
+100ファイル・800テスト・スクリーンショット100回について、各フェーズでウォームアップ1回＋計測3回を実行しています。
 
-[保存した生の計測値・メタデータ](scaling-results-linux-ci.json)には、ウォームアップを含む全8回の結果とPRのテスト用merge commitを記録しています。
-GitHubのartifact保存期間が過ぎても、このJSONで掲載値を確認できます。
+| ランナー | 時間の中央値 | ピークPSSの中央値 |
+| --- | ---: | ---: |
+| bun-webview-test | 9.49秒 | 674.3 MiB |
+| Vitest Browser Mode | 11.10秒 | 885.5 MiB |
+
+この実行では時間が14.5%短縮、ピークPSSが23.9%少ない結果でした。
+[保存した生の計測値・メタデータ](scaling-results-linux-ci-memory.json)には、全16回の結果とPRのテスト用merge commitを記録しています。
+
+以前の[PR #6の時間のみの計測](https://github.com/ts020/bun-browser-test/actions/runs/37550092193)は、10.31秒対12.99秒（20.7%短縮）でした。
+その[生データ](scaling-results-linux-ci.json)も保持しています。ホスト型ランナーでは負荷が変わるため、実行間の差をそのまま性能改善・悪化とはみなせません。
+GitHubのartifact保存期間が過ぎても、これらのJSONで掲載値を確認できます。
 
 ## Installation size
 

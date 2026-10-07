@@ -83,13 +83,13 @@ See the official [Vitest Browser Mode guide](https://vitest.dev/guide/browser/) 
 
 ### Performance
 
-In the recorded **Linux CI run, bun-webview-test completed in 10.31s versus Vitest's 12.99s — 20.7% less time**.
+In the recorded **Linux CI run, bun-webview-test completed in 9.49s versus Vitest's 11.10s — 14.5% less time**.
 Both runners used **the same Chrome Headless Shell 145.0.7632.6 executable**.
 
 | Linux CI: Headless Shell | Median time |
 | --- | ---: |
-| bun-webview-test | **10.31s** |
-| Vitest Browser Mode + Playwright | 12.99s |
+| bun-webview-test | **9.49s** |
+| Vitest Browser Mode + Playwright | 11.10s |
 
 Ubuntu 24.04 x64, Bun 1.4.2, Node 24.21.0, Vitest 5.0.3 and Playwright 1.56.1; two workers per runner.
 The workload contains 100 files, 800 tests and 100 screenshots, made by repeating five existing files twenty times.
@@ -97,8 +97,8 @@ Each runner gets one warmup followed by three measured runs, with alternating ex
 process startup and exit, and exclude dependency/browser installation. bun-webview-test uses `--parallel=2 --no-isolate`.
 This measures file-count scaling, not 800 distinct cases; hosted-runner load and other suites can produce different results.
 
-[GitHub Actions run](https://github.com/ts020/bun-browser-test/actions/runs/37550092193) ·
-[Saved samples and environment](bench/vitest-browser/scaling-results-linux-ci.json) ·
+[GitHub Actions run](https://github.com/ts020/bun-browser-test/actions/runs/37551576464) ·
+[Saved samples and environment](bench/vitest-browser/scaling-results-linux-ci-memory.json) ·
 [Reproduce the benchmark](bench/vitest-browser/README.md#ci-benchmark)
 
 <details>
@@ -175,17 +175,21 @@ are recorded separately; extracted browser sizes are not measured here.
 
 ### Memory efficiency
 
-An earlier Linux benchmark with **the same regular Chromium binary** measured the following serial suite
-(21 files / 127 tests). Peak memory is process-tree PSS including Chromium, sampled every 50 ms, in MiB.
+In the same Linux CI job and with the same workload and two-worker settings, separate memory runs measured
+**674.3 MiB versus Vitest's 885.5 MiB — 23.9% lower peak PSS**.
 
-| Runner | Peak memory |
+| Runner | Median peak process-tree PSS |
 | --- | ---: |
-| bun-webview-test | 382 MiB |
-| Vitest | 770 MiB |
+| bun-webview-test | **674.3 MiB** |
+| Vitest Browser Mode + Playwright | 885.5 MiB |
 
-Peak memory was about 50% lower in that workload. **Memory was not measured in the recorded Headless Shell timing-only CI run**
-or the macOS/WKWebView comparisons. These are separate measurements, not a speed-and-memory result for one configuration.
-[Earlier suite and startup measurements](bench/vitest-browser/README.md#earlier-linux-measurements).
+PSS includes the host runner, workers, servers and browser processes, with shared pages proportionally counted.
+Each row is the median of three per-run peaks after one warmup, sampled at a target interval of 50 ms.
+Memory sampling runs separately so it does not affect the timing figures above; brief peaks may be missed.
+[Saved samples and environment](bench/vitest-browser/scaling-results-linux-ci-memory.json).
+
+The macOS and WKWebView comparisons did not measure memory. Historical regular-Chromium measurements use a
+different workload; see [earlier Linux results](bench/vitest-browser/README.md#earlier-linux-measurements).
 
 ## Requirements
 
