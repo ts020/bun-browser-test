@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           shell_path="$(bun -e 'import { installedHeadlessShell } from "./src/browser-binary"; const path = installedHeadlessShell(); if (!path) throw new Error("Headless Shell missing"); console.log(path);')"
-          python3 bench/vitest-browser/scaling.py --chrome-shell "$shell_path" --groups 20 --workers 2 --runs 3 --memory --bun-only
+          python3 bench/vitest-browser/scaling.py --chrome-shell "$shell_path" --groups 20 --workers 2 --runs 1 --memory --bun-only
       - name: Publish benchmark summary
         if: always()
         shell: bash

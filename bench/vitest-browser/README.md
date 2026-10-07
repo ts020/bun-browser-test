@@ -72,20 +72,21 @@ GitHub Actionsの **Browser benchmark → Run workflow** から手動実行も�
 
 - Ubuntu 24.04、Bun 1.4.2、Python 3.12。本パッケージのCLIで取得した固定版Headless Shellを使用します。
 - 100ファイル・800テスト・スクリーンショット100回、`--parallel=2 --no-isolate`。
-- 時間・メモリそれぞれウォームアップ1回＋計測3回、合計8回を順番に実行します。両ランナーを測る従来の16回から半減します。
+- 時間・メモリそれぞれウォームアップ1回＋計測1回、合計4回を順番に実行します。両ランナーを測る従来の16回から4分の1になります。
 - `--bun-only` によりNodeの準備、比較用依存のnpm install、Vitestの実行を省きます。ブラウザ導入は計測区間に含めません。
-- Summaryに実行時間の中央値・各回のピークPSSの中央値（MiB）を表示します。比較モードのみVitestに対する削減率も出力します。
+- Summaryに単回の実行時間・ピークPSS（MiB）を表示します。`--runs 2` 以上なら中央値を出し、比較モードのみVitestに対する削減率も出力します。
 - 各回の終了コードと成功テスト数・ファイル数を確認し、失敗時はジョブも失敗します。
 - `benchmark-results-*` artifactに結果・メタデータ・ログを30日保存します。比較モードでは比較用依存のlockfileも保存します。
 
 ホスト型ランナーでは負荷やCPU性能が変わるため、速度の閾値は設けていません。
+CIの単回値だけで性能劣化を判断せず、気になる変化は `--runs 3` 以上で再計測してください。
 macOSの4ワーカーの掲載値とCIの2ワーカーの値は直接比較できません。
 時間計測の後に、同じ条件でメモリを別途計測します。
 
 同じ設定をLinuxで動かす例（先に `bun src/cli.ts install` を実行）：
 
 ```sh
-python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 3 --memory --bun-only
+python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 1 --memory --bun-only
 ```
 
 Vitestと再比較するときは `--bun-only` を外し、Node.js・npmを用意してください。
@@ -106,7 +107,7 @@ Vitestの `browser.isolate: false` はブラウザ内の状態も共有するた
 `--memory` はLinux専用です。`/proc/<pid>/smaps_rollup` のPSSを目標50ms間隔で集計します。
 ランナー・ワーカー・サーバー・ブラウザを含め、共有メモリは利用割合に応じて数えます。
 専用セッションと実行ごとの環境マーカーで、親から切り離されたChromeも追跡します。無関係なプロセスとPythonの計測処理は含みません。
-各時点の合計の最大値をその回のピークとし、ウォームアップを除いた3回のピークの中央値を比較します。
+各時点の合計の最大値をその回のピークとします。CIは単回値、下記の保存済み比較はウォームアップを除いた3回のピークの中央値です。
 個々のプロセスの最大値を足した値ではなく、短いピークはサンプリングで見逃す可能性があります。
 
 時間計測中にはメモリをサンプリングしません。メモリ計測用の実行は `phase: "memory"` として保存し、その実行時間は速度の中央値に混ぜません。

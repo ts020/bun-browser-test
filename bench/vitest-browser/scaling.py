@@ -299,12 +299,14 @@ def main():
     if not args.bun_only:
         settings += (f' Vitest: `maxWorkers: {args.workers}`, `fileParallelism: true`, `browser.isolate: true`. '
                      "Bun's flag controls host isolation, not browser isolation.")
+    repetition = f'median of {args.runs} measured runs' if args.runs > 1 else 'one measured run (single sample)'
+    columns = '| Runner | Median time (s) | Median peak PSS (MiB) |' if args.runs > 1 else '| Runner | Time (s) | Peak PSS (MiB) |'
     report = [
         '## Browser benchmark', '',
         f'{len(paths)} files / {40 * args.groups} tests / {args.workers} workers. '
-        f'One warmup per phase, median of {args.runs} measured runs; startup and exit included.', '',
+        f'One warmup per phase, {repetition}; startup and exit included.', '',
         settings, '',
-        '| Runner | Median time (s) | Median peak PSS (MiB) |', '| --- | ---: | ---: |',
+        columns, '| --- | ---: | ---: |',
         *[f'| {runner} | {seconds:.3f} | {format(memory_medians[runner], ".1f") if runner in memory_medians else "not measured"} |' for runner, seconds in medians.items()], '',
     ]
     for browser in ['chrome', 'shell']:
@@ -320,6 +322,8 @@ def main():
     if not args.bun_only:
         report += ['', 'Both runners use the same browser executable for each pair, workload, viewport and worker limit. '
                    'Browser launch flags, process counts and storage/context lifetimes remain implementation-specific.']
+    if args.runs == 1:
+        report += ['', 'Single samples are noisy; repeat with --runs 3 or more before judging a regression.']
     report += ['', 'Hosted-runner results vary; these results are informational, not a performance gate.', '']
     (WORK / 'summary.md').write_text('\n'.join(report))
     print(json.dumps(summary, indent=2))

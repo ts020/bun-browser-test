@@ -438,10 +438,11 @@ beforeAll(() => getSession(), 30_000);
 ### ベンチマークCI
 
 [Browser benchmark ワークフロー](.github/workflows/benchmark.yml)は、関連する変更のPR・`main`へのpush時に、Ubuntuで **bun-webview-testだけ** を計測します。Actionsの **Run workflow** から手動実行もできます。
-固定版Headless Shell・100ファイル／800テスト・`--parallel=2 --no-isolate` で、時間・メモリそれぞれウォームアップ1回＋計測3回、合計8回を実行します。
+固定版Headless Shell・100ファイル／800テスト・`--parallel=2 --no-isolate` で、時間・メモリそれぞれウォームアップ1回＋計測1回、合計4回を実行します。
 CI短縮のため、Nodeの準備・比較用依存のインストール・Vitestの実行を省きます。
 
-Summaryには実行時間の中央値と、ブラウザを含む各回のピークPSSの中央値（MiB）を表示します。
+Summaryには単回の実行時間と、ブラウザを含むピークPSS（MiB）を表示します。
+単回値は変動しやすいため、性能劣化を判断するときはローカルで `--runs 3` 以上に増やして確認してください。
 メモリは目標50ms間隔で別途計測し、速度計測にはサンプリング負荷を含めません。
 生の計測値・実行環境・ログをartifactとして30日保存し、失敗時も取得済みのログを残します。
 時間・メモリの値ではCIを落とさず、テスト失敗や計測の未完了は失敗にします。
