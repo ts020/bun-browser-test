@@ -506,18 +506,19 @@ beforeAll(() => getSession(), 30_000);
 
 ### Benchmark workflow
 
-The [Browser benchmark workflow](.github/workflows/benchmark.yml) compares both runners on Ubuntu for relevant PRs
-and pushes to `main`, and can also be started from Actions with **Run workflow**. It uses the same pinned Shell,
-100 files / 800 tests, two workers, one warmup and three measured runs. Results appear in the job summary;
-raw samples, runtime versions, dependency lockfile and logs are retained as artifacts for 30 days, including
-available logs on failure. Timing differences do not fail CI; test failures or incomplete runs do.
-Bun runs with `--parallel=2 --no-isolate`; Vitest uses `maxWorkers: 2`, `fileParallelism: true` and
-`browser.isolate: true`. Both create a fresh browser document per file: Bun's `--no-isolate` preserves host state,
-so disabling Vitest's browser isolation would change the comparison conditions.
-The workflow also runs a separate memory phase with the same settings, one warmup and three samples.
-It reports the median of per-run peak process-tree PSS (MiB), including browsers, sampled at a target interval of 50 ms.
-Memory sampling does not run during the timing phase. Install-size measurement remains separate.
-See [CI benchmark details](bench/vitest-browser/README.md#ci-benchmark).
+The [Browser benchmark workflow](.github/workflows/benchmark.yml) measures **bun-webview-test only** on Ubuntu
+for relevant PRs and pushes to `main`, and can also be started from Actions with **Run workflow**.
+It uses the pinned Headless Shell, 100 files / 800 tests and `--parallel=2 --no-isolate`.
+Time and memory each have one warmup and three measured runs: eight executions in total.
+Node setup, the comparison dependency install and Vitest executions are omitted to shorten CI.
+
+The job summary reports median elapsed time and median per-run peak process-tree PSS (MiB), including browsers.
+Memory is sampled separately at a target interval of 50 ms, so sampling does not affect the timing figures.
+Raw samples, runtime versions and logs are retained as artifacts for 30 days, including available logs on failure.
+Performance values do not fail CI; test failures or incomplete measurements do.
+
+The Vitest comparisons above are saved historical runs. To repeat a comparison locally, omit `--bun-only` from
+the benchmark command. See [CI benchmark details](bench/vitest-browser/README.md#ci-benchmark).
 
 ## Contributing
 

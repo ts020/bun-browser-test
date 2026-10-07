@@ -437,14 +437,17 @@ beforeAll(() => getSession(), 30_000);
 
 ### ベンチマークCI
 
-[Browser benchmark ワークフロー](.github/workflows/benchmark.yml)で、関連する変更の PR・`main` への push 時に Ubuntu 上で比較します。Actions の **Run workflow** から手動実行もできます。
-両ランナーで同じ固定版 Shell を使い、100ファイル・800テスト、2ワーカー、ウォームアップ1回＋計測3回で測定します。
-結果はジョブの Summary に表示し、生の計測値・実行環境・依存の lockfile・ログを artifact として30日保存します。失敗時も取得済みのログを保存します。
-Bunは `--parallel=2 --no-isolate`、Vitestは `maxWorkers: 2`・`fileParallelism: true`・`browser.isolate: true` です。
-両者ともファイルごとにブラウザのdocumentを作り直します。Bunの `--no-isolate` はホスト側の設定なので、Vitestのブラウザ分離を無効にすると比較条件が変わります。
-メモリも同じ設定で別途ウォームアップ1回＋計測3回を行い、ブラウザを含むPSSを目標50ms間隔で集計した各回のピークの中央値（MiB）を表示します。
-速度計測中にはメモリをサンプリングしません。導入容量の計測は別です。
-時間・メモリの差ではCIを落とさず、テスト失敗や計測の未完了は失敗にします。[CIの詳細](bench/vitest-browser/README.md#ci-benchmark)を参照してください。
+[Browser benchmark ワークフロー](.github/workflows/benchmark.yml)は、関連する変更のPR・`main`へのpush時に、Ubuntuで **bun-webview-testだけ** を計測します。Actionsの **Run workflow** から手動実行もできます。
+固定版Headless Shell・100ファイル／800テスト・`--parallel=2 --no-isolate` で、時間・メモリそれぞれウォームアップ1回＋計測3回、合計8回を実行します。
+CI短縮のため、Nodeの準備・比較用依存のインストール・Vitestの実行を省きます。
+
+Summaryには実行時間の中央値と、ブラウザを含む各回のピークPSSの中央値（MiB）を表示します。
+メモリは目標50ms間隔で別途計測し、速度計測にはサンプリング負荷を含めません。
+生の計測値・実行環境・ログをartifactとして30日保存し、失敗時も取得済みのログを残します。
+時間・メモリの値ではCIを落とさず、テスト失敗や計測の未完了は失敗にします。
+
+上記のVitest比較は過去の保存済み計測です。再比較する場合は、ローカルでベンチマークの `--bun-only` を外してください。
+[CIの詳細](bench/vitest-browser/README.md#ci-benchmark)を参照してください。
 
 ## 開発
 

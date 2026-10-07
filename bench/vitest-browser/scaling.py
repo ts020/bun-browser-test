@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the same repeated browser workload, including process startup/exit."""
+"""Benchmark a repeated browser workload, optionally comparing with Vitest."""
 import argparse
 import hashlib
 import json
@@ -153,6 +153,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--chrome', default=os.environ.get('BUN_CHROME_PATH'), help='Compare both runners using this regular Chrome executable')
     parser.add_argument('--chrome-shell', help='Compare both runners using this Chrome Headless Shell executable; can be used alone')
+    parser.add_argument('--bun-only', action='store_true', help='Measure only Bun; skip Node/Playwright setup and Vitest runs')
     parser.add_argument('--groups', type=int, default=20)
     parser.add_argument('--workers', type=int, default=2)
     parser.add_argument('--runs', type=int, default=3)
@@ -188,15 +189,20 @@ def main():
     config = (SOURCE / 'bwt.config.ts').read_text().replace('"../../src/vitest/config"', json.dumps(config_path))
     config = config.replace('defineConfig({', 'defineConfig({\n  viewport: { width: 414, height: 896 },')
     (WORK / 'bwt.config.ts').write_text(config)
-    (WORK / 'package.json').write_text(json.dumps({
-        'private': True, 'type': 'module',
-        'dependencies': {
+    package = {'private': True, 'type': 'module'}
+    if not args.bun_only:
+        package['dependencies'] = {
             'vitest': '5.0.3', '@vitest/browser-playwright': '5.0.3', 'playwright': '1.56.1',
             '@vitest/cjs-lib': 'file:./cjs-lib', '@vitest/bundled-lib': 'file:./bundled-lib',
-        },
-    }, indent=2))
-    subprocess.run(['npm', 'install', '--prefix', str(WORK), '--ignore-scripts', '--no-audit', '--no-fund'], check=True)
-    shutil.copy2(BENCH / 'scaling-vitest.config.mts', WORK / 'vitest.config.mts')
+        }
+    (WORK / 'package.json').write_text(json.dumps(package, indent=2))
+    if not args.bun_only:
+        subprocess.run(['npm', 'install', '--prefix', str(WORK), '--ignore-scripts', '--no-audit', '--no-fund'], check=True)
+        shutil.copy2(BENCH / 'scaling-vitest.config.mts', WORK / 'vitest.config.mts')
+    else:
+        # Do not publish stale comparison artifacts when switching modes.
+        for name in ['package-lock.json', 'vitest.config.mts']:
+            (WORK / name).unlink(missing_ok=True)
 
     # Drop only this script's generated groups, so changing --groups cannot leave extra tests.
     for group in WORK.glob('g[0-9]*'):
@@ -217,12 +223,15 @@ def main():
     vitest_command = ['node', str(WORK / 'node_modules/vitest/vitest.mjs'), 'run', '--config', str(WORK / 'vitest.config.mts'), '--no-color']
     commands = {}
     if chrome:
-        commands.update(chrome=bun_command, vitest=vitest_command)
+        commands['chrome'] = bun_command
+        if not args.bun_only:
+            commands['vitest'] = vitest_command
     if args.webkit:
         commands['webkit'] = bun_command
     if chrome_shell:
         commands['chrome-shell'] = bun_command
-        commands['vitest-shell'] = vitest_command
+        if not args.bun_only:
+            commands['vitest-shell'] = vitest_command
     env = dict(os.environ, CI='1', NO_COLOR='1', FORCE_COLOR='0', BENCH_WORKERS=str(args.workers))
     for key in ['BWT_CONFIG', 'BWT_SHARED_CHROME', 'BWT_PROFILE_LOG', 'BWT_DEBUG']:
         env.pop(key, None)
@@ -231,13 +240,12 @@ def main():
         'warmup_runs': 1, 'measured_runs': args.runs, 'cpu_count': os.cpu_count(),
         'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
         'bun': subprocess.check_output(['bun', '--revision'], text=True).strip(),
-        'node': subprocess.check_output(['node', '--version'], text=True).strip(),
-        'vitest': '5.0.3', 'playwright': '1.56.1',
+        'mode': 'bun-only' if args.bun_only else 'comparison',
+        'vitest': '5.0.3',  # Also used by Bun's browser test runtime.
         'test_sha256': {name: hashlib.sha256((SOURCE / f'test/{name}.test.ts').read_bytes()).hexdigest() for name in FILES},
         'measurement': 'Fresh processes, sequential runners, rotated order, wall time including startup/exit. Repeated fixtures. Memory uses separate runs when enabled.',
         'runner_settings': {
             'bun': {'parallel': args.workers, 'isolate': False, 'browser_document_per_file': True},
-            'vitest': {'maxWorkers': args.workers, 'fileParallelism': True, 'browser_isolate': True},
             'viewport': {'width': 414, 'height': 896},
         },
         'commands': commands,
@@ -245,6 +253,10 @@ def main():
                    'sample_interval_ms': SAMPLE_INTERVAL * 1000, 'separate_runs': True,
                    'scope': 'Runner, workers, servers and browser processes, including reparented processes identified by a unique inherited run marker. Sampler excluded.'},
     }
+    if not args.bun_only:
+        metadata['node'] = subprocess.check_output(['node', '--version'], text=True).strip()
+        metadata['playwright'] = '1.56.1'
+        metadata['runner_settings']['vitest'] = {'maxWorkers': args.workers, 'fileParallelism': True, 'browser_isolate': True}
     if chrome:
         metadata['chromium_executable'] = str(chrome)
         metadata['chromium'] = subprocess.check_output([str(chrome), '--version'], text=True).strip()
@@ -278,18 +290,20 @@ def main():
     memory_medians = {runner: statistics.median(r['peak_pss_mib'] for r in rows if r['runner'] == runner and r['iteration'] > 0 and r['phase'] == 'memory') for runner in runners} if args.memory else {}
     summary = {'medians': medians, 'median_peak_pss_mib': memory_medians}
     for browser, bun_runner, vitest_runner in [('chrome', 'chrome', 'vitest'), ('shell', 'chrome-shell', 'vitest-shell')]:
-        if bun_runner in medians:
+        if bun_runner in medians and vitest_runner in medians:
             summary[f'{browser}_time_reduction_vs_vitest_percent'] = 100 * (1 - medians[bun_runner] / medians[vitest_runner])
             if memory_medians:
                 summary[f'{browser}_memory_reduction_vs_vitest_percent'] = 100 * (1 - memory_medians[bun_runner] / memory_medians[vitest_runner])
     (WORK / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+    settings = f'Bun: `--parallel={args.workers} --no-isolate`; fresh browser document per file.'
+    if not args.bun_only:
+        settings += (f' Vitest: `maxWorkers: {args.workers}`, `fileParallelism: true`, `browser.isolate: true`. '
+                     "Bun's flag controls host isolation, not browser isolation.")
     report = [
         '## Browser benchmark', '',
         f'{len(paths)} files / {40 * args.groups} tests / {args.workers} workers. '
         f'One warmup per phase, median of {args.runs} measured runs; startup and exit included.', '',
-        f'Bun: `--parallel={args.workers} --no-isolate`. Vitest: `maxWorkers: {args.workers}`, '
-        '`fileParallelism: true`, `browser.isolate: true`. Both create a fresh browser document per file; '
-        "Bun's flag controls host isolation, not browser isolation.", '',
+        settings, '',
         '| Runner | Median time (s) | Median peak PSS (MiB) |', '| --- | ---: | ---: |',
         *[f'| {runner} | {seconds:.3f} | {format(memory_medians[runner], ".1f") if runner in memory_medians else "not measured"} |' for runner, seconds in medians.items()], '',
     ]
@@ -303,9 +317,10 @@ def main():
                    'PSS includes the runner, workers, servers and browser processes (including reparented children); shared pages are proportionally counted. '
                    'Each sample sums live processes; the column is the median of per-run peaks, not a sum of individual process peaks. '
                    'Sampling may miss brief peaks. The Python sampler is excluded.']
-    report += ['', 'Both runners use the same browser executable for each pair, workload, viewport and worker limit. '
-               'Browser launch flags, process counts and storage/context lifetimes remain implementation-specific. '
-               'Hosted-runner results vary; these results are informational, not a performance gate.', '']
+    if not args.bun_only:
+        report += ['', 'Both runners use the same browser executable for each pair, workload, viewport and worker limit. '
+                   'Browser launch flags, process counts and storage/context lifetimes remain implementation-specific.']
+    report += ['', 'Hosted-runner results vary; these results are informational, not a performance gate.', '']
     (WORK / 'summary.md').write_text('\n'.join(report))
     print(json.dumps(summary, indent=2))
 

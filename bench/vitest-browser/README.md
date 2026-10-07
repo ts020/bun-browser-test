@@ -29,7 +29,8 @@ python3 bench.py 5 suite/bwt-par   # 一部だけ（名前の前方一致）
 python3 bench/vitest-browser/scaling.py --chrome /absolute/path/to/chrome --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 4 --runs 3 --webkit
 ```
 
-リポジトリの依存を `bun install` で入れ、Bun・Node.js・npm・Python 3 を用意してください。
+リポジトリの依存を `bun install` で入れ、Bun・Python 3 を用意してください。比較モードではNode.js・npmも必要です。
+`--bun-only` を付けるとBunだけを実行し、比較用のnpm依存インストールを省きます。
 `--webkit` は macOS のみです。他の OS では省略してください。
 `--chrome-shell` を追加すると Headless Shell でも両ランナーを比較します。
 Shell だけを比較する場合は `--chrome` を省略して `--chrome-shell` だけを指定できます（`BUN_CHROME_PATH` も未設定にします）。
@@ -65,25 +66,29 @@ CI と開発環境でも固定してください。
 
 ## CI benchmark
 
-[Browser benchmark](../../.github/workflows/benchmark.yml) は、関連ファイルの PR・`main` への push と `workflow_dispatch` に対応します。
-GitHub Actions の **Browser benchmark → Run workflow** から手動実行できます。新しいワークフローは default branch に取り込まれてから手動実行できます。
+[Browser benchmark](../../.github/workflows/benchmark.yml) は、関連ファイルのPR・`main`へのpushと `workflow_dispatch` に対応します。
+継続CIでは **Bunだけ** を計測します。過去のVitestとの比較結果は下に保存しています。
+GitHub Actionsの **Browser benchmark → Run workflow** から手動実行もできます。
 
-- Ubuntu 24.04、Bun 1.4.2、Node 24、Python 3.12。Node の patch 版など実際の実行環境は `metadata.json` に記録します。
-- 本パッケージの CLI で取得した同じ Headless Shell を両ランナーに明示指定します。ブラウザ導入や npm install は計測区間に含めません。
-- 100ファイル・800テスト・スクリーンショット100回、2ワーカー、ウォームアップ1回＋計測3回。ランナーを順番に動かし、順序は回ごとに交代します。
-- 各回の終了コードだけでなく成功テスト数・ファイル数も確認します。失敗時はジョブも失敗し、残っているログを保存します。
-- Summary に実行時間の中央値・各回のピークPSSの中央値（MiB）と、Vitestに対する時間・メモリの削減率を表示します。負の削減率は bun-webview-test のコストが高いことを表します。
-- `benchmark-results-*` artifact に結果・メタデータ・比較用依存の `package-lock.json`・ログを30日保存します。
+- Ubuntu 24.04、Bun 1.4.2、Python 3.12。本パッケージのCLIで取得した固定版Headless Shellを使用します。
+- 100ファイル・800テスト・スクリーンショット100回、`--parallel=2 --no-isolate`。
+- 時間・メモリそれぞれウォームアップ1回＋計測3回、合計8回を順番に実行します。両ランナーを測る従来の16回から半減します。
+- `--bun-only` によりNodeの準備、比較用依存のnpm install、Vitestの実行を省きます。ブラウザ導入は計測区間に含めません。
+- Summaryに実行時間の中央値・各回のピークPSSの中央値（MiB）を表示します。比較モードのみVitestに対する削減率も出力します。
+- 各回の終了コードと成功テスト数・ファイル数を確認し、失敗時はジョブも失敗します。
+- `benchmark-results-*` artifactに結果・メタデータ・ログを30日保存します。比較モードでは比較用依存のlockfileも保存します。
 
-ホスト型ランナーでは実行ごとに負荷や CPU 性能が変わるため、速度の閾値は設けていません。
-macOS の4ワーカーの掲載値と CI の2ワーカーの値は直接比較できません。
-時間計測の後に、同じ条件で両ランナーのメモリを別途計測します。以前の時間のみの結果や `bench.py` の直列スイートとは分けて扱います。
+ホスト型ランナーでは負荷やCPU性能が変わるため、速度の閾値は設けていません。
+macOSの4ワーカーの掲載値とCIの2ワーカーの値は直接比較できません。
+時間計測の後に、同じ条件でメモリを別途計測します。
 
 同じ設定をLinuxで動かす例（先に `bun src/cli.ts install` を実行）：
 
 ```sh
-python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 3 --memory
+python3 bench/vitest-browser/scaling.py --chrome-shell /absolute/path/to/chrome-headless-shell --groups 20 --workers 2 --runs 3 --memory --bun-only
 ```
+
+Vitestと再比較するときは `--bun-only` を外し、Node.js・npmを用意してください。
 
 ### 比較条件とメモリ計測
 
@@ -105,10 +110,10 @@ Vitestの `browser.isolate: false` はブラウザ内の状態も共有するた
 個々のプロセスの最大値を足した値ではなく、短いピークはサンプリングで見逃す可能性があります。
 
 時間計測中にはメモリをサンプリングしません。メモリ計測用の実行は `phase: "memory"` として保存し、その実行時間は速度の中央値に混ぜません。
-どちらのフェーズでも成功テスト数とファイル数を確認し、終了後に子プロセスが残れば停止して計測を失敗にします。
+Bun単独・比較モードのどちらでも各フェーズの成功テスト数とファイル数を確認し、終了後に子プロセスが残れば停止して計測を失敗にします。
 PSSが読めない場合も0として処理せず失敗にします。Linux以外では `--memory` を省略すると時間のみを測れます。
 
-`metadata.json` には実行コマンド・分離設定・ワーカー数・計測方法を保存します。
+`metadata.json` には実行モード（`bun-only` / `comparison`）・実行コマンド・分離設定・ワーカー数・計測方法を保存します。
 `results.json` のメモリ行には `peak_pss_mib`・`memory_samples`・`peak_process_count` を、
 `summary.json` には `median_peak_pss_mib` と削減率を記録します。
 
