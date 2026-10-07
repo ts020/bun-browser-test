@@ -5,6 +5,7 @@ pathIgnorePatterns = [
   "bench/**",
   # 失敗することを確かめるための fixtures。test/browser/specs から個別に実行する
   "test/browser/fixtures/failing/**",
+  "test/browser/fixtures/completion/**",
   "test/browser/fixtures/timeout/**",
   "test/browser/fixtures/timeout-hooks/**",
   "test/browser/fixtures/timeout-actions/**",

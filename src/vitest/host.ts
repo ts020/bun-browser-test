@@ -934,8 +934,24 @@ export async function runBrowserTestFile(filepath: string): Promise<void> {
   }
   registerTasks(session, file.tasks ?? []);
   afterAll(async () => {
-    await Promise.race([session.finished.promise, Bun.sleep(30_000)]);
-    await session.close(true);
+    let completed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      // Receipt of onFinished precedes the browser consuming its response.
+      // Keep the page alive until the client and its error reporting settle.
+      await Promise.race([
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Timed out after 30000ms waiting for browser completion")), 30_000);
+        }),
+        session.view.evaluate("__bwt_tester__.finished.then(() => true)"),
+      ]);
+      completed = true;
+    } finally {
+      clearTimeout(timer);
+      // A timed-out evaluate may still occupy the queue. Do not navigate or
+      // enqueue another evaluate to reset this page; close it directly.
+      await session.close(completed);
+    }
     if (session.unhandled.length) {
       const err = combine(session.unhandled);
       err.message = `Unhandled error(s) in the browser:\n${err.message}`;

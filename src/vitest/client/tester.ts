@@ -59,7 +59,7 @@ function serializeUnhandled(error: unknown) {
 }
 
 function reportUnhandled(error: unknown, type: string) {
-  rpc("onUnhandledError", serializeUnhandled(error), type).catch(() => {});
+  return rpc("onUnhandledError", serializeUnhandled(error), type).catch(() => {});
 }
 
 /** テスト側が自分で error リスナーを付けていれば、そのエラーは扱われたものとみなす（vitest と同じ）。 */
@@ -234,17 +234,17 @@ async function run() {
   try {
     await startTests([{ filepath: boot.testFile.filepath, testLocations: undefined }], runner);
   } catch (err) {
-    reportUnhandled(err, "Run Error");
+    await reportUnhandled(err, "Run Error");
   }
   try {
     await (userEvent as any).cleanup();
     await Promise.all(getBrowserState().cleanups.map((fn) => fn()));
   } catch (err) {
-    reportUnhandled(err, "Cleanup Error");
+    await reportUnhandled(err, "Cleanup Error");
   }
   await rpc("onFinished");
 }
 
 // Bun 側から呼ぶもの（toMatchScreenshot の撮影の前後など）
-Object.assign(globalThis, { __bwt_tester__: { page, prepareScreenshot, finishScreenshot } });
-run().catch((err) => reportUnhandled(err, "Run Error"));
+const finished = run().catch((err) => reportUnhandled(err, "Run Error"));
+Object.assign(globalThis, { __bwt_tester__: { page, prepareScreenshot, finishScreenshot, finished } });
