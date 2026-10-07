@@ -317,7 +317,7 @@ def main():
     if args.memory:
         report += ['', 'Memory is sampled in separate executions at a target interval of 50 ms, so sampling does not affect the timing column. '
                    'PSS includes the runner, workers, servers and browser processes (including reparented children); shared pages are proportionally counted. '
-                   'Each sample sums live processes; the column is the median of per-run peaks, not a sum of individual process peaks. '
+                   'Each sample sums live processes; per-run peaks are based on those totals, not a sum of individual process peaks. '
                    'Sampling may miss brief peaks. The Python sampler is excluded.']
     if not args.bun_only:
         report += ['', 'Both runners use the same browser executable for each pair, workload, viewport and worker limit. '
