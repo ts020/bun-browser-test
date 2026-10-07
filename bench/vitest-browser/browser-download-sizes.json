@@ -1,0 +1,42 @@
+{
+  "version": "145.0.7632.6",
+  "archives": [
+    {
+      "browser": "chrome",
+      "platform": "linux64",
+      "bytes": 175440843,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/linux64/chrome-linux64.zip"
+    },
+    {
+      "browser": "chrome",
+      "platform": "mac-arm64",
+      "bytes": 170206961,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/mac-arm64/chrome-mac-arm64.zip"
+    },
+    {
+      "browser": "chrome",
+      "platform": "win64",
+      "bytes": 181196793,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/win64/chrome-win64.zip"
+    },
+    {
+      "browser": "chrome-headless-shell",
+      "platform": "linux64",
+      "bytes": 116288461,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/linux64/chrome-headless-shell-linux64.zip"
+    },
+    {
+      "browser": "chrome-headless-shell",
+      "platform": "mac-arm64",
+      "bytes": 95530994,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/mac-arm64/chrome-headless-shell-mac-arm64.zip"
+    },
+    {
+      "browser": "chrome-headless-shell",
+      "platform": "win64",
+      "bytes": 114056639,
+      "url": "https://storage.googleapis.com/chrome-for-testing-public/145.0.7632.6/win64/chrome-headless-shell-win64.zip"
+    }
+  ],
+  "measurement": "HTTPS HEAD Content-Length of official ZIPs; bytes, not extracted size."
+}

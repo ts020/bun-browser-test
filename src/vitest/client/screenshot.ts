@@ -1,6 +1,7 @@
 // スクリーンショットの前後にページ側でやること（撮る範囲の計算、mask、アニメーションとキャレットの停止）。
 // Playwright の screenshotter.ts と同じ振る舞いにしている。
 import { elementRect, resolveElement, type SerializedLocator } from "./actions";
+import { boot } from "./boot";
 
 export interface ScreenshotPrepareOptions {
   element?: SerializedLocator;
@@ -34,8 +35,11 @@ export async function prepareScreenshot(options: ScreenshotPrepareOptions): Prom
   if (options.animations === "disabled") disableAnimations();
   if (options.mask?.length) addMasks(options.mask, options.maskColor);
   if (options.style) addStyle(options.style);
-  // スタイルの変更を描画に反映させる
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // Chrome の Page.captureScreenshot は描画を同期してから撮影する。
+  // WKWebView のスナップショットでは、先にスタイルの変更を描画に反映させる。
+  if (boot.backend === "webkit") {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
   return { clip };
 }
 

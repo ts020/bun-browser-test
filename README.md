@@ -2,7 +2,7 @@
 
 [日本語](./README.ja.md)
 
-**Browser tests for `bun test`.** A real browser (WKWebView on macOS, Chrome elsewhere) runs inside your ordinary
+**Browser tests for `bun test`.** A real browser (Chrome Headless Shell by default) runs inside your ordinary
 `bun test` process through [`Bun.WebView`](https://bun.com/docs), with locators, `userEvent` and `expect.element`
 modeled on [Vitest Browser Mode](https://vitest.dev/guide/browser/). No Playwright, no separate test runner, and
 existing Vitest Browser Mode tests can run as they are.
@@ -15,13 +15,13 @@ existing Vitest Browser Mode tests can run as they are.
 
 ## Quick start
 
-You need Bun **1.3.14** or later. On macOS that is all; on Linux you also need Chrome or Chromium
-(see [Requirements](#requirements)).
+You need Bun **1.3.14** or later and Chrome Headless Shell (see [Requirements](#requirements)).
 
 1. Install:
 
    ```sh
    bun add -d bun-webview-test
+   bunx bun-webview-test install
    ```
 
 2. Register the preload in `bunfig.toml`:
@@ -71,16 +71,50 @@ From here: [rendering things](#rendering-something), [locators](#locators), [`ex
 ## Requirements
 
 - Bun **1.3.14** or later (`Bun.WebView` is required).
-- A browser:
-  - **macOS**: the system WKWebView is used by default. Nothing to install.
-  - **Linux / other**: Chrome or Chromium. Bun finds an installed Chrome automatically. Otherwise set
-    `BUN_CHROME_PATH` to the executable, or point `PLAYWRIGHT_BROWSERS_PATH` at a Playwright install and its
-    Chromium is used.
+- **Chrome Headless Shell** is the default on macOS, Linux and Windows.
+  Run `bunx bun-webview-test install` to download the pinned **145.0.7632.6** build directly from
+  [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/). No Playwright packages,
+  full Chrome, or FFmpeg are downloaded by this command. Complete cached downloads are reused.
+- Extraction requires `unzip` on macOS/Linux or PowerShell on Windows. Linux also needs Chromium's
+  system libraries (including NSS, X11, GBM and ALSA); the command does not install OS packages.
+  The default build supports macOS arm64/x64, Linux x64 and Windows x64/x86. Linux arm64 needs a newer
+  published build selected with `BWT_BROWSER_VERSION`, or a compatible executable via `BUN_CHROME_PATH`.
 
-WKWebView is the macOS default for its low startup cost and zero browser installation; local scaling checks
-with replicated tests also finished sooner than Chrome. It uses the OS's WebKit version and has limitations
-around Tab, hover and touch, plus History and CSS differences. Use `BWT_BACKEND=chrome` when your tests need
-those features or Chromium behavior; see [Backend compatibility](#backend-compatibility).
+Both test APIs use the `chrome` backend with Shell to reduce overhead and keep the browser choice consistent across OSes.
+
+### Downloading the browser
+
+After adding the package to your project, run its included CLI:
+
+```sh
+bunx bun-webview-test install
+```
+
+The CLI ships with this package, so downloading the browser requires no Playwright or additional npm packages.
+To use only the locally installed CLI, run `bunx --no-install bun-webview-test install`.
+Browser installation is managed by the consuming project. Neither `bun install` nor test execution
+performs an automatic download, and the browser is not bundled in the npm package.
+
+The installer uses the OS cache directory under `bun-webview-test`, with a separate directory for each
+version/platform. Set `BWT_BROWSERS_PATH` to choose another cache, such as one saved by CI.
+Set `BWT_BROWSER_VERSION` to an exact four-part Chrome version to override the default; use the **same values
+for installation and test execution**. In a custom cache or with an explicit version, a missing browser
+is an error rather than a fallback to a different version.
+
+```sh
+BWT_BROWSERS_PATH=./.cache/bun-webview-test bunx bun-webview-test install
+BWT_BROWSERS_PATH=./.cache/bun-webview-test bun test
+```
+
+An explicit `BUN_CHROME_PATH` takes priority. Otherwise, we use the pinned managed download, then fall back
+to the newest installed Shell revision in Playwright's standard cache for existing users. An explicit
+`PLAYWRIGHT_BROWSERS_PATH` selects that cache instead, unless `BWT_BROWSERS_PATH` or `BWT_BROWSER_VERSION` is also set.
+Hermetic Playwright installs (`PLAYWRIGHT_BROWSERS_PATH=0`) require `BUN_CHROME_PATH`.
+
+To use regular Chrome, set `BUN_CHROME_PATH` to its executable (`chromePath` also works with the native API).
+On macOS, `BWT_BACKEND=webkit` opts into the system WKWebView without a browser download. WKWebView depends
+on the OS's WebKit version and has Tab, hover, touch, History and CSS differences;
+see [Backend compatibility](#backend-compatibility).
 
 ## Configuration
 
@@ -101,9 +135,11 @@ The browser starts the first time a test touches `page` and is shared by every t
 second to start; resetting the page between tests takes tens of milliseconds). Tests that never touch `page`
 pay nothing.
 
-For many test files, `bun test --parallel --no-isolate` is the fastest way to run. As in Vitest Browser Mode, tests
-that run in the browser get a fresh page for every file, so they are isolated from each other without recreating
-Bun's globals (what `--isolate` adds is isolation of Bun-side state such as `mock`).
+For many test files, use `bun test --parallel --no-isolate`. Each file runs in a fresh browser document, with fresh
+DOM, globals, and module instances. Chrome reuses the tab within a worker, resetting the document, session storage,
+history, and pointer between files. Files that use raw CDP or access a custom command's `view` dispose of the tab
+instead. `--isolate` additionally resets Bun-side state such as `mock`. Cookies and local storage remain scoped to
+the browser origin; this is not a fresh browser profile per file.
 
 `bun test --parallel` (and `--isolate`) work too. Chrome is launched once per worker process and reused even when
 the globals are recreated for each file; it stops when the process exits. Set `BWT_SHARED_CHROME=0` to turn this
@@ -113,8 +149,8 @@ reuse off.
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `backend` | `"webkit"` on macOS, `"chrome"` elsewhere | Also settable with the `BWT_BACKEND` environment variable |
-| `chromePath` | `BUN_CHROME_PATH`, or Playwright's Chromium | Chrome executable. Bun auto-detects when unset |
+| `backend` | `"chrome"` on every OS | Also settable with the `BWT_BACKEND` environment variable |
+| `chromePath` | `BUN_CHROME_PATH`, managed Shell, or existing Playwright Shell | Explicit path can also select regular Chrome |
 | `chromeArgs` | `["--no-sandbox"]` when running as root | Extra Chrome arguments |
 | `width` / `height` | 1280 / 720 | Viewport size |
 | `actionTimeout` | 3000 | How long actions such as `click` wait for the element (ms) |
@@ -317,8 +353,15 @@ unprivileged user namespaces:
 - uses: oven-sh/setup-bun@v2
 - run: bun install --frozen-lockfile
 - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-- run: BUN_CHROME_PATH="$(command -v google-chrome)" bun test
+- run: bunx bun-webview-test install
+  env:
+    BWT_BROWSERS_PATH: ${{ github.workspace }}/.cache/bun-webview-test
+- run: bun test
+  env:
+    BWT_BROWSERS_PATH: ${{ github.workspace }}/.cache/bun-webview-test
 ```
+
+These Ubuntu runners already include Chromium system libraries and `unzip`; minimal containers must install them separately.
 
 When running as root (for example in Docker), `--no-sandbox` is added automatically.
 
@@ -332,9 +375,110 @@ import { getSession } from "bun-webview-test";
 beforeAll(() => getSession(), 30_000);
 ```
 
+## Compared with Vitest Browser Mode
+
+This comparison uses Vitest with `@vitest/browser-playwright` and Chromium. Other providers and browsers have different characteristics.
+
+| Aspect | bun-webview-test | Vitest Browser Mode / Playwright |
+| --- | --- | --- |
+| Test runner | `bun test`; results appear in Bun's runner | Vitest; results appear in Vitest's runner |
+| Module transformation and serving | Bun build APIs and an HTTP server built with `Bun.serve` | Vite dev server and its plugin pipeline |
+| Browser control | `Bun.WebView`, with Chrome Headless Shell by default | Playwright provider; Chromium can also use Headless Shell |
+| Browser download | Included `bun-webview-test install` CLI; fixed Shell build only | Playwright CLI; `--only-shell` can omit full Chromium |
+| Integration | Bun workflow and a Vitest-compatible API; see [supported features](#what-works-like-vitest) and [limitations](#not-supported) | Vite configuration/plugins and Playwright's Chromium, Firefox and WebKit support |
+
+See the official [Vitest Browser Mode guide](https://vitest.dev/guide/browser/) and [Playwright browser installation guide](https://playwright.dev/docs/browsers) for the compared configuration.
+
+### Execution flow
+
+For existing Vitest-style tests, both systems execute test code in a real browser. The host runner, module server and browser-control layer differ:
+
+```mermaid
+flowchart LR
+  subgraph BWT["bun-webview-test"]
+    A["bun test + preload"] --> B["Bun transforms and serves modules"]
+    A --> C["Bun.WebView"]
+    C --> D["Browser: test iframe"]
+    B --> D
+    D --> E["Results reported to bun test"]
+  end
+  subgraph Vitest["Vitest Browser Mode"]
+    F["Vitest runner"] --> G["Vite transforms and serves modules"]
+    F --> H["Playwright provider"]
+    H --> I["Browser: test iframe"]
+    G --> I
+    I --> J["Results reported to Vitest"]
+  end
+```
+
+This diagram describes responsibilities, not one OS process per box. Chromium still uses multiple processes.
+With the native `bun-webview-test` API, test functions run in Bun and operate on the browser through `page`;
+the diagram describes the Vitest-compatible API. With `--no-isolate`, eligible Chrome tabs are reused within a worker,
+while each file gets a fresh document. See [configuration](#configuration) for isolation details.
+
+### Download and installed size
+
+In isolated macOS arm64 projects installed with Bun 1.4.2, the npm files occupied **47.9 MB** for this working
+package and its dependencies, versus **50.0 MB** for Vitest 5.0.3, `@vitest/browser-playwright` 5.0.3 and Playwright 1.56.1.
+These are logical file sizes under `node_modules`, excluding symlinks, browsers, runtimes and package-manager caches;
+they are not compressed download sizes or filesystem block usage. The saving in this snapshot is modest.
+This package still depends on `vitest` and `@vitest/browser`, and Vite is installed transitively; avoiding their host
+pipeline at runtime does not remove those npm dependencies. See [size data and measurement method](bench/vitest-browser/README.md#installation-size).
+
+Browser downloads are separate. Official Chrome for Testing **145.0.7632.6** ZIP sizes (decimal MB):
+
+| Platform | Headless Shell | Full Chrome |
+| --- | ---: | ---: |
+| macOS arm64 | 95.5 MB | 170.2 MB |
+| Linux x64 | 116.3 MB | 175.4 MB |
+| Windows x64 | 114.1 MB | 181.2 MB |
+
+These compare browser artifacts, not the two test runners. Using the same Shell artifact gives both runners the
+same browser footprint. Our installer fetches only Shell; Playwright can also omit full Chromium with
+[`--only-shell`](https://playwright.dev/docs/browsers#chromium-headless-shell). Do not treat the Shell-versus-Chrome
+saving as an inherent advantage over Vitest. [Exact archive sizes and URLs](bench/vitest-browser/browser-download-sizes.json)
+are recorded separately; extracted browser sizes are not measured here.
+
 ## Performance
 
-Measured against Vitest 5.0.3 Browser Mode (`@vitest/browser-playwright`) on the same 4-core machine with the same
+The [Browser benchmark workflow](.github/workflows/benchmark.yml) compares both runners on Ubuntu for relevant PRs
+and pushes to `main`, and can also be started from Actions with **Run workflow**. It uses the same pinned Shell,
+100 files / 800 tests, two workers, one warmup and three measured runs. Results appear in the job summary;
+raw samples, runtime versions, dependency lockfile and logs are retained as artifacts for 30 days, including
+available logs on failure. Timing differences do not fail CI; test failures or incomplete runs do.
+This workflow measures elapsed time; memory and install-size measurements are separate. See [CI benchmark details](bench/vitest-browser/README.md#ci-benchmark).
+
+On an Apple M2 Pro (macOS 26.6.2, Bun 1.4.2, Node 26.3.0), the 100-file / 800-test scaling workload
+completed **26.5% sooner than Vitest with Chrome Headless Shell**, or **11.6% sooner with regular Chrome in headless mode**.
+Each pair uses the same Chromium 145.0.7632.6 executable and four workers. Medians of three runs after one warmup,
+including process startup and exit; bun-webview-test uses `--parallel=4 --no-isolate`.
+
+| Browser executable | bun-webview-test | Vitest 5.0.3 / Playwright 1.56.1 |
+| --- | ---: | ---: |
+| Chrome Headless Shell | **3.93s** | 5.35s |
+| Regular Chrome, headless | **8.14s** | 9.21s |
+| WKWebView | 8.14s | — |
+
+The workload repeats five existing test files twenty times, including 100 screenshots; it measures file-count scaling,
+not 800 distinct test cases. Regular Chrome previously took 14.90s. Tab reuse, one document reset per file, immutable
+runtime caching, and avoiding duplicate paint waits before Chrome screenshots reduce overhead. Raw CDP and custom
+`view` access bypass tab reuse. This is one machine and workload, not a guarantee for every suite or OS. Memory was
+not measured. See [reproduction and samples](bench/vitest-browser/README.md#file-count-scaling).
+
+Headless Shell is selected automatically after installation. To pin an exact executable:
+
+```sh
+BWT_BACKEND=chrome BUN_CHROME_PATH=/absolute/path/to/chrome-headless-shell bun test --parallel=4 --no-isolate
+```
+
+[Headless Shell is a separate browser implementation](https://developer.chrome.com/docs/automation-and-testing/headless#use-old-headless-mode),
+with behavior differences from regular Chrome. Pin the same executable type and version in development and CI;
+use regular Chrome when fidelity to the full browser matters. Shell and regular Chrome can differ in screenshots, PDF viewing, extensions and GPU/WebGL behavior.
+For image comparisons, also pin the OS and fonts.
+
+### Earlier Linux measurement
+
+An earlier measurement compared Vitest 5.0.3 Browser Mode (`@vitest/browser-playwright`) on the same 4-core machine with the same
 headless Chromium binary, running the ported `test/browser/test` suite (21 files, 127 tests). Wall time from process
 start to exit, median of 5 warm runs. The scripts are in
 [`bench/vitest-browser`](bench/vitest-browser).
@@ -347,16 +491,25 @@ start to exit, median of 5 warm runs. The scripts are in
 | Vitest (default, files in parallel) | 6.3s |
 | Vitest (`--no-file-parallelism`) | 7.6s |
 
-Startup, for a file with a single test (cold / warm; cold clears the caches, `.vite` / `.bwt`, first):
+### Memory efficiency
+
+The following figures come from the earlier Linux benchmark, using the same regular Chromium binary.
+Peak memory is process-tree PSS including Chromium, sampled every 50 ms; shared pages are proportionally counted.
+Values are MiB (the benchmark script labels them MB). Startup uses a single test; cold runs first clear `.vite` / `.bwt` caches.
 
 | | Time (cold / warm) | Peak memory |
 | --- | --- | --- |
-| bun-webview-test | 0.53s / 0.53s | 329MB |
-| Vitest | 2.42s / 2.00s | 788MB / 567MB |
+| bun-webview-test | 0.53s / 0.53s | 329 MiB |
+| Vitest | 2.42s / 2.00s | 788 / 567 MiB (cold / warm) |
 
-With `--parallel --no-isolate`, bun-webview-test runs the suite about 20% faster than Vitest's default parallel run
-and starts about 4x faster. Run one file at a time, its peak memory (the PSS of the process tree including Chromium)
-is about half of Vitest's (382MB vs 770MB).
+| Serial suite, 21 files / 127 tests | Peak process-tree PSS |
+| --- | ---: |
+| bun-webview-test | 382 MiB |
+| Vitest | 770 MiB |
+
+In that earlier workload, `--parallel --no-isolate` reduced suite time by about 20% and startup time by about 75%.
+Serial suite peak memory was about 50% lower. This does not establish the memory cost of the current Shell default,
+the macOS scaling workload, or WKWebView; those remain unmeasured. Worker count and test content affect memory usage.
 
 ## About this package
 
@@ -371,7 +524,8 @@ not here; the author of this package is not on the Bun team and cannot act on th
 
 ```sh
 bun install
-bun test            # needs Chrome on Linux (BUN_CHROME_PATH, or Chromium under PLAYWRIGHT_BROWSERS_PATH)
+bun src/cli.ts install # download Headless Shell using this checkout's CLI
+bun test
 bun run typecheck
 bun run build       # type declarations into dist/
 bun run lint:package

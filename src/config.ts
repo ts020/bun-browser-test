@@ -1,10 +1,14 @@
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { browserCacheRoot, installedHeadlessShell } from "./browser-binary";
+
 export interface BrowserConfig {
   /**
-   * "webkit" は macOS のみ。既定は macOS なら "webkit"、それ以外は "chrome"。
+   * 既定は全 OS で "chrome"（Headless Shell）。"webkit" は macOS のみ。
    * 環境変数 BWT_BACKEND でも上書きできる。
    */
   backend: "webkit" | "chrome";
-  /** Chrome の実行ファイル。未指定なら BUN_CHROME_PATH か Bun の自動検出。 */
+  /** 実行ファイル。未指定なら BUN_CHROME_PATH、次にインストール済みの Headless Shell。 */
   chromePath?: string;
   /** Chrome に追加で渡す引数。root で動かすときは --no-sandbox を自動で足す。 */
   chromeArgs: string[];
@@ -24,19 +28,33 @@ export interface BrowserConfig {
   resetBetweenTests: boolean;
 }
 
-/** BUN_CHROME_PATH、なければ Playwright が入れた Chromium（PLAYWRIGHT_BROWSERS_PATH）を使う。 */
+/** 明示指定、専用キャッシュ、既存の Playwright インストールの順で探す。 */
 export function detectChromePath(): string | undefined {
   if (process.env.BUN_CHROME_PATH) return process.env.BUN_CHROME_PATH;
-  const dir = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (!dir) return undefined;
-  const glob = new Bun.Glob("chromium-*/chrome-linux*/chrome");
-  for (const p of glob.scanSync({ cwd: dir, onlyFiles: true })) return `${dir}/${p}`;
-  return undefined;
+  const configured = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const managed = process.env.BWT_BROWSERS_PATH || process.env.BWT_BROWSER_VERSION;
+  if (managed || !configured) {
+    const installed = installedHeadlessShell();
+    if (installed || managed) return installed;
+  }
+  // Playwright の hermetic install はそのパッケージ内にあるため、自動探索しない。
+  if (configured === "0") return undefined;
+  const dir = configured ? resolve(configured) : join(browserCacheRoot(), "ms-playwright");
+  if (!existsSync(dir)) return undefined;
+  const layout = process.platform === "darwin" ? "*mac*" : process.platform === "win32" ? "*win*" : "*linux*";
+  const glob = new Bun.Glob(`chromium_headless_shell-*/${layout}/*`);
+  const paths = [...glob.scanSync({ cwd: dir, onlyFiles: true })].filter((p) =>
+    /(?:^|[/\\])(?:chrome-headless-shell|headless_shell)(?:\.exe)?$/.test(p),
+  );
+  // 複数のインストールがある場合も、ファイルシステムの列挙順に依存させない。
+  paths.sort((a, b) => Number(b.match(/chromium_headless_shell-(\d+)/)?.[1] ?? 0)
+    - Number(a.match(/chromium_headless_shell-(\d+)/)?.[1] ?? 0) || a.localeCompare(b));
+  return paths[0] ? join(dir, paths[0]) : undefined;
 }
 
 function defaults(): BrowserConfig {
   const env = process.env.BWT_BACKEND;
-  const backend = env === "webkit" || env === "chrome" ? env : process.platform === "darwin" ? "webkit" : "chrome";
+  const backend = env === "webkit" ? "webkit" : "chrome";
   const isRoot = process.getuid?.() === 0;
   return {
     backend,

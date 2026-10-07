@@ -27,10 +27,17 @@ const DEFAULT_ARGS = [
 
 /**
  * Bun.WebView の backend。Chrome の場所が分かっていれば、このプロセス用の Chrome を起動（起動済みなら再利用）してそこにつなぐ。
- * 場所が分からないときや Windows では、これまでどおり Bun.WebView に起動させる。
+ * Windows では指定された実行ファイルを Bun.WebView に起動させる。
  */
 export async function chromeBackend(path: string | undefined, argv: string[]): Promise<ChromeBackend> {
-  if (!path || process.platform === "win32" || process.env.BWT_SHARED_CHROME === "0") {
+  if (!path) {
+    throw new Error(
+      "bun-webview-test: Chrome Headless Shell was not found. " +
+      "Run `bunx bun-webview-test install`, or set BUN_CHROME_PATH to a browser executable. " +
+      "Use BWT_BROWSERS_PATH for a custom download cache, or PLAYWRIGHT_BROWSERS_PATH for an existing Playwright cache.",
+    );
+  }
+  if (process.platform === "win32" || process.env.BWT_SHARED_CHROME === "0") {
     return { type: "chrome", url: false, path, argv };
   }
   const key = Bun.hash(JSON.stringify([path, argv])).toString(36);

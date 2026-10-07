@@ -14,14 +14,14 @@ export interface RunResult {
 
 export async function runBrowserTests(
   fixture: string,
-  options: { config?: Record<string, unknown>; files?: string[] } = {},
+  options: { config?: Record<string, unknown>; files?: string[]; isolate?: boolean } = {},
 ): Promise<RunResult> {
   const dir = `./test/browser/fixtures/${fixture}/`;
   const targets = options.files?.map((f) => `${dir}${f}`) ?? [dir];
   // AI エージェントの中で動いていると bun test は (pass) の行を省くので、その目印を外す。
   // GitHub Actions の中では失敗ごとに ::error 注釈を足して出力が変わるので、それも外す
   const { CLAUDECODE: _c, AI_AGENT: _a, AGENT: _g, GITHUB_ACTIONS: _gh, ...parentEnv } = process.env;
-  const proc = Bun.spawn([process.execPath, "test", "--path-ignore-patterns=__none__", ...targets], {
+  const proc = Bun.spawn([process.execPath, "test", "--path-ignore-patterns=__none__", ...(options.isolate === false ? ["--no-isolate"] : []), ...targets], {
     cwd: PACKAGE_ROOT,
     env: {
       ...parentEnv,

@@ -1,0 +1,56 @@
+{
+  "machine": "Apple M2 Pro, macOS 26.6.2 (25G83), arm64",
+  "bun": "1.4.2+744846f84",
+  "node": "26.3.0",
+  "chromium": "145.0.7632.6",
+  "vitest": "5.0.3",
+  "playwright": "1.56.1",
+  "workload": "Five unmodified test files repeated twenty times; 100 files, 800 tests, 100 screenshots, four workers.",
+  "measurement": "Wall time in seconds, fresh process per run, five sequential runners with rotated order, one warmup per runner excluded. Matched Chromium executable for each BWT/Vitest pair. Memory not measured.",
+  "samples": {
+    "chrome": [
+      8.049010374990758,
+      8.265672917012125,
+      8.138256207981613
+    ],
+    "vitest": [
+      9.119633666006848,
+      9.439648792031221,
+      9.205872207996435
+    ],
+    "webkit": [
+      8.142626916989684,
+      8.456220957974438,
+      7.859146833012346
+    ],
+    "chrome-shell": [
+      3.8747925420175306,
+      4.196168042020872,
+      3.9330459159682505
+    ],
+    "vitest-shell": [
+      5.322611041017808,
+      5.348985792021267,
+      5.693780041998252
+    ]
+  },
+  "before_tab_reuse_chrome": {
+    "commit": "90e651055ceca49d81a7a4ef7c652752e8fc5139",
+    "samples": [
+      14.898370209033601,
+      14.965303540986497,
+      14.055552041972987
+    ]
+  },
+  "test_sha256": {
+    "basic": "ec0667e5ffaf4c16b434dfd8f7cd69052175cb325e3b52e04bbb370ac3051cd4",
+    "dom": "211540f22a38384b4585aa341f293dc2cef06a411820af77a711486d12c05292",
+    "env": "9b111dee4c34c8f61cc2cdd63db05a10e0bd2f5b5dd8b754aa414f19df56c478",
+    "findElement": "58731c9a74bbd00897ddecd7b2cb1054bf1eef7758dddf45b6169b068e326e9e",
+    "utils": "be609067f7b621f632c71948958362b0ae8e193afbdd78e5f61ddd8bd3c86576"
+  },
+  "chromium_executables": {
+    "chrome": "Google Chrome for Testing (--headless)",
+    "chrome-shell": "chrome-headless-shell"
+  }
+}

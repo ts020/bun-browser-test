@@ -11,6 +11,8 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      BWT_BROWSERS_PATH: ${{ github.workspace }}/.cache/bun-webview-test
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -23,5 +25,7 @@ jobs:
       # Ubuntu 24.04 は非特権のユーザー名前空間を AppArmor で制限していて、Chrome のサンドボックスが起動できない
       - name: Allow Chrome sandbox
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - name: Test (Chrome)
-        run: BUN_CHROME_PATH="$(command -v google-chrome)" bun test
+      - name: Install Chrome Headless Shell
+        run: bun src/cli.ts install
+      - name: Test (Headless Shell default)
+        run: bun test
