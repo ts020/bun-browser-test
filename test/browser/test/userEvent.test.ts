@@ -742,7 +742,7 @@ describe('userEvent.keyboard', async () => {
   })
 })
 
-describe.skipIf(server.provider === 'preview')('userEvent.dragAndDrop', async () => {
+describe.skipIf(server.provider === 'preview' || server.browser === 'firefox')('userEvent.dragAndDrop', async () => {
   test('drag and drop works', async () => {
     const source = document.createElement('div')
     source.textContent = 'Drag me'

@@ -3,8 +3,9 @@
 [日本語](./README.ja.md)
 
 **Browser tests for `bun test`.** Control a real browser (Chrome Headless Shell by default) from
-`bun test` through [`Bun.WebView`](https://bun.com/docs), with locators, `userEvent` and `expect.element`
-modeled on [Vitest Browser Mode](https://vitest.dev/guide/browser/). No Playwright, no separate test runner, and
+`bun test` using [`Bun.WebView`](https://bun.com/docs) for Chrome/WKWebView or direct WebDriver BiDi for Firefox,
+with locators, `userEvent` and `expect.element`
+modeled on [Vitest Browser Mode](https://vitest.dev/guide/browser/). No Playwright or separate test runner is needed, and
 a Vitest-compatible API lets supported tests run in the browser.
 
 > [!NOTE]
@@ -366,6 +367,54 @@ export default defineConfig({
 Put JSON in the `BWT_CONFIG` environment variable to override settings like CLI flags, e.g.
 `BWT_CONFIG='{"locators":{"errorFormat":"html"}}' bun test`.
 
+### Firefox / Gecko
+
+The Vitest-compatible API runs **regular Firefox directly through WebDriver BiDi** using Bun's WebSocket.
+No Playwright or geckodriver is required. Install a current [Firefox release](https://www.mozilla.org/firefox/),
+then run headlessly (the default, `headless: true`):
+
+```sh
+BWT_BACKEND=firefox bun test --parallel=4 --no-isolate
+```
+
+Alternatively, set `backend: "firefox"` in `bwt.config.ts` or `configureBrowserMode()`.
+`BWT_BACKEND` overrides that setting; supported values are `chrome`, `webkit`, and `firefox`.
+`server.browser` defaults to `"firefox"`. Run the same tests with each engine in separate commands.
+
+Executable lookup order is `BWT_FIREFOX_PATH`, `firefoxPath`, `firefox` on PATH, then the standard
+macOS or Windows installation directory. `firefoxArgs` adds launch arguments; overriding the managed
+profile or debugging connection is rejected. Firefox is installed separately; `bun-webview-test install`
+and `BWT_BROWSERS_PATH` apply only to Chrome. The connection uses Firefox's
+[built-in WebDriver BiDi endpoint](https://developer.mozilla.org/en-US/docs/Web/WebDriver/How_to/Create_BiDi_connection).
+
+Firefox uses a fresh process and temporary profile for every file, then awaits shutdown and removes the profile.
+DOM, globals, modules, input, cookies and storage are isolated even with `--no-isolate` and `--parallel=4`.
+Chrome's tab reuse does not apply to Firefox. Test execution and reporting still use Bun and the existing
+Vitest-compatible runtime, independently of [Bun.WebView's proposed Firefox backend](https://github.com/oven-sh/bun/issues/29204).
+
+Native mouse/keyboard input, viewport changes, screenshots and custom commands that do not access `view`
+are supported. CDP commands/listeners, custom command `context.view` access and screenshot `omitBackground`
+throw explicit unsupported errors. HTML5 drag and drop is also rejected because Gecko does not yet
+deliver the complete native drop sequence through BiDi ([upstream issue](https://bugzilla.mozilla.org/show_bug.cgi?id=1515879)).
+The native `bun-webview-test` page API requires Bun.WebView and rejects
+Firefox; use `vitest/browser` instead.
+
+For GitHub Actions on Ubuntu (which provides Firefox's system libraries):
+
+```yaml
+- uses: actions/checkout@v5
+- uses: oven-sh/setup-bun@v2
+- run: bun install --frozen-lockfile
+- uses: browser-actions/setup-firefox@v1
+  id: firefox
+  with:
+    firefox-version: latest
+- run: bun test --parallel=4 --no-isolate
+  env:
+    BWT_BACKEND: firefox
+    BWT_FIREFOX_PATH: ${{ steps.firefox.outputs.firefox-path }}
+```
+
 ### Parallelism and isolation
 
 For many Vitest-compatible test files, use `bun test --parallel --no-isolate`. Each file runs in a fresh browser document, with fresh
@@ -426,7 +475,9 @@ failures are known before reporting. A todo remains a todo even in a suite with 
 
 ## Backend compatibility
 
-Set `BWT_BACKEND=chrome` or `BWT_BACKEND=webkit` when comparing results. WKWebView uses the macOS system
+For Firefox support and its limitations, see [Firefox / Gecko](#firefox--gecko).
+
+Set `BWT_BACKEND=chrome` or `BWT_BACKEND=webkit` when comparing the Bun.WebView backends. WKWebView uses the macOS system
 WebKit; it is a different build from Playwright WebKit. The following was checked with Bun 1.4.2,
 macOS 26.6.2 and Chromium 145.0.7632.6; engine behavior may change with upgrades.
 

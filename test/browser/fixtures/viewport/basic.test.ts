@@ -1,7 +1,7 @@
 import { page, userEvent, server } from "vitest/browser";
 import { expect, test } from "vitest";
 
-test("drag and drop over large viewport", async () => {
+test.skipIf(server.browser === "firefox")("drag and drop over large viewport", async () => {
   // put boxes horizontally [1] [2] ... [30]
   // then drag-and-drop from [1] to [30]
 

@@ -2,12 +2,23 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { browserCacheRoot, installedHeadlessShell } from "./browser-binary";
 
+export type BrowserBackend = "webkit" | "chrome" | "firefox";
+
+/** Environment selection takes precedence over configuration; never silently switch engines. */
+export function resolveBackend(configured: BrowserBackend = "chrome"): BrowserBackend {
+  const backend = process.env.BWT_BACKEND || configured;
+  if (backend !== "chrome" && backend !== "webkit" && backend !== "firefox") {
+    throw new Error(`bun-webview-test: Unknown backend "${backend}". Choose chrome, webkit, or firefox.`);
+  }
+  return backend;
+}
+
 export interface BrowserConfig {
   /**
    * 既定は全 OS で "chrome"（Headless Shell）。"webkit" は macOS のみ。
-   * 環境変数 BWT_BACKEND でも上書きできる。
+   * "firefox" は Vitest 互換 API のみ。環境変数 BWT_BACKEND でも上書きできる。
    */
-  backend: "webkit" | "chrome";
+  backend: BrowserBackend;
   /** 実行ファイル。未指定なら BUN_CHROME_PATH、次にインストール済みの Headless Shell。 */
   chromePath?: string;
   /** Chrome に追加で渡す引数。root で動かすときは --no-sandbox を自動で足す。 */
@@ -53,8 +64,7 @@ export function detectChromePath(): string | undefined {
 }
 
 function defaults(): BrowserConfig {
-  const env = process.env.BWT_BACKEND;
-  const backend = env === "webkit" ? "webkit" : "chrome";
+  const backend = resolveBackend();
   const isRoot = process.getuid?.() === 0;
   return {
     backend,

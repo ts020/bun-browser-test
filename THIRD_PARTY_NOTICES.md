@@ -32,10 +32,11 @@ SOFTWARE.
 ## Playwright
 
 Files: `src/vitest/input.ts`, `src/vitest/us-keyboard-layout.ts`, `src/vitest/mac-editing-commands.ts`,
-`src/vitest/client/actions.ts`. Source: https://github.com/microsoft/playwright
+`src/vitest/client/actions.ts`, `test/browser/specs/playwright-input.test.ts`. Source: https://github.com/microsoft/playwright
 
 Playwright is Copyright (c) Microsoft Corporation and is licensed under the Apache License, Version 2.0.
-The adapted files have been modified (ported onto `Bun.WebView` and the Chrome DevTools Protocol).
+The adapted files have been modified (ported onto `Bun.WebView`, WebDriver BiDi and bun:test).
+The adapted input tests also retain Copyright 2018 Google Inc. All rights reserved.
 
 ```
 Apache License

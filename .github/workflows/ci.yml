@@ -29,3 +29,23 @@ jobs:
         run: bun src/cli.ts install
       - name: Test (Headless Shell default)
         run: bun test
+
+  firefox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BWT_BACKEND: firefox
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - uses: browser-actions/setup-firefox@v1
+        id: firefox
+        with:
+          firefox-version: latest
+      - name: Use the installed Firefox
+        run: echo "BWT_FIREFOX_PATH=${{ steps.firefox.outputs.firefox-path }}" >> "$GITHUB_ENV"
+      - name: Test Vitest-compatible API (Firefox, four workers)
+        run: bun test --parallel=4 --no-isolate ./test/browser ./test/vitest
+      - name: Test Firefox with Bun isolation
+        run: bun test ./test/vitest

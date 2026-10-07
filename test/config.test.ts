@@ -43,9 +43,10 @@ for (const [platform, oldLayout, newLayout] of [
   });
 }
 
-test("explicit Chrome and WKWebView selections remain available", () => {
+test("explicit Chrome, WKWebView and Firefox selections remain available", () => {
   expect(config("darwin", { BUN_CHROME_PATH: "/custom/chrome" })).toMatchObject({ backend: "chrome", chromePath: "/custom/chrome" });
   expect(config("darwin", { BWT_BACKEND: "webkit" }).backend).toBe("webkit");
+  expect(config("darwin", { BWT_BACKEND: "firefox" }).backend).toBe("firefox");
 });
 
 test("missing Shell never falls back to an installed full Chrome", async () => {
@@ -55,4 +56,18 @@ test("missing Shell never falls back to an installed full Chrome", async () => {
   expect(config("linux", { PLAYWRIGHT_BROWSERS_PATH: "0" }).chromePath).toBeUndefined();
   const { chromeBackend } = await import("../src/chrome");
   await expect(chromeBackend(undefined, [])).rejects.toThrow("bunx bun-webview-test install");
+});
+
+test("unknown backend selections fail instead of running Chromium", () => {
+  const result = Bun.spawnSync([process.execPath, "-e", `await import(${JSON.stringify(new URL("../src/config.ts", import.meta.url).href)})`], {
+    env: { ...process.env, BWT_BACKEND: "firfox" }, stdout: "pipe", stderr: "pipe",
+  });
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stderr.toString()).toContain('Unknown backend "firfox"');
+});
+
+test("native API rejects Firefox before starting a browser", async () => {
+  const { BrowserSession } = await import("../src/session");
+  const { getConfig } = await import("../src/config");
+  await expect(BrowserSession.start({ ...getConfig(), backend: "firefox" })).rejects.toThrow("Vitest-compatible API only");
 });

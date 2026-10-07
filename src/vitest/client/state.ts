@@ -161,11 +161,16 @@ export function getWorkerState(): any {
 
 function createCdp() {
   const listeners: Record<string, Function[]> = {};
+  const assertSupported = () => {
+    if (boot.backend === "firefox") throw new Error("CDP is not supported by the firefox backend. Use the chrome backend for CDP.");
+  };
   const cdp = {
     send(method: string, params?: Record<string, unknown>) {
+      assertSupported();
       return rpc("cdp", method, params);
     },
     on(event: string, listener: (payload: any) => void) {
+      assertSupported();
       (listeners[event] ??= []).push(listener);
       rpc("cdpListen", event).catch(() => {});
       return cdp;

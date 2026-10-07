@@ -2,7 +2,7 @@
 
 [English](./README.md)
 
-**`bun test` でブラウザのテストを書くためのモジュールです。** [`Bun.WebView`](https://bun.com/docs) を通じて `bun test` から本物のブラウザ（既定は Chrome Headless Shell）を起動し、[Vitest Browser Mode](https://vitest.dev/guide/browser/)と同じ形の
+**`bun test` でブラウザのテストを書くためのモジュールです。** `bun test` から本物のブラウザ（既定は Chrome Headless Shell）を起動し、Chrome / WKWebView は [`Bun.WebView`](https://bun.com/docs)、Firefox は WebDriver BiDi で操作します。[Vitest Browser Mode](https://vitest.dev/guide/browser/)と同じ形の
 ロケーター、`userEvent`、`expect.element` で操作します。Playwright も別のテストランナーも要りません。Vitest互換APIでは、対応する既存テストをブラウザ内で実行できます。
 
 > [!NOTE]
@@ -334,6 +334,53 @@ export default defineConfig({
 
 環境変数 `BWT_CONFIG` に JSON を入れると、CLI オプションのように設定を上書きできます（例: `BWT_CONFIG='{"locators":{"errorFormat":"html"}}' bun test`）。
 
+### Firefox / Gecko
+
+Vitest互換APIでは、Bun の WebSocket から **通常版 Firefox を WebDriver BiDi で直接操作**します。
+Playwright や geckodriver は不要です。現在の [Firefox](https://www.mozilla.org/firefox/) をインストールし、
+次のコマンドで実行します。既定はヘッドレスです（`headless: true`）。
+
+```sh
+BWT_BACKEND=firefox bun test --parallel=4 --no-isolate
+```
+
+`bwt.config.ts` または `configureBrowserMode()` の `backend: "firefox"` でも選択できます。
+`BWT_BACKEND` が設定より優先され、`chrome` / `webkit` / `firefox` を指定できます。
+`server.browser` の既定値は `"firefox"` です。同じテストを各エンジンの別コマンドで実行できます。
+
+実行ファイルは `BWT_FIREFOX_PATH`、`firefoxPath`、PATH 上の `firefox`、macOS / Windows の
+標準インストール先の順に探します。追加引数は `firefoxArgs` で設定しますが、管理対象のプロファイルや
+デバッグ接続の上書きはエラーになります。Firefox は別途インストールしてください。
+`bun-webview-test install` と `BWT_BROWSERS_PATH` は Chrome 専用です。
+接続には Firefox 内蔵の [WebDriver BiDi endpoint](https://developer.mozilla.org/en-US/docs/Web/WebDriver/How_to/Create_BiDi_connection) を使います。
+
+Firefox はファイルごとに新しいプロセスと一時プロファイルを作り、終了を待ってプロファイルを削除します。
+`--no-isolate` / `--parallel=4` でも DOM・globals・module state・入力・Cookie・storage を分離します。
+Chrome のタブ再利用は適用されません。テスト実行と結果報告には Bun と既存の Vitest 互換ランタイムを使い、
+[Bun.WebView の Firefox 対応要望](https://github.com/oven-sh/bun/issues/29204)の実装には依存しません。
+
+ネイティブのマウス・キーボード入力、viewport 変更、スクリーンショット、`view` を参照しない
+カスタムコマンドに対応します。CDP のコマンド・イベント購読、カスタムコマンドの `context.view`、
+スクリーンショットの `omitBackground` は明示的な非対応エラーになります。
+HTML5 ドラッグ＆ドロップも、Gecko が BiDi 経由で完全な drop イベント列を配送しないため非対応エラーになります（[上流 issue](https://bugzilla.mozilla.org/show_bug.cgi?id=1515879)）。
+ネイティブの `bun-webview-test` page API は Firefox 非対応です。`vitest/browser` を使ってください。
+
+GitHub Actions の Ubuntu（Firefox のシステムライブラリ導入済み）では、次のように実行できます。
+
+```yaml
+- uses: actions/checkout@v5
+- uses: oven-sh/setup-bun@v2
+- run: bun install --frozen-lockfile
+- uses: browser-actions/setup-firefox@v1
+  id: firefox
+  with:
+    firefox-version: latest
+- run: bun test --parallel=4 --no-isolate
+  env:
+    BWT_BACKEND: firefox
+    BWT_FIREFOX_PATH: ${{ steps.firefox.outputs.firefox-path }}
+```
+
 ### 並列実行と分離
 
 Vitest互換APIのテストファイルが多い場合は `bun test --parallel --no-isolate` を使ってください。DOM・グローバル変数・モジュールはファイルごとに新しくなります。Chrome はワーカー内でタブを再利用し、ファイル間で document・sessionStorage・履歴・ポインターをリセットします。生の CDP やカスタムコマンドの `view` を使ったファイルの後は、タブを閉じます。`--isolate` はさらに Bun 側の `mock` などの状態を分離します。Cookie と localStorage はブラウザの origin 単位であり、ファイルごとにブラウザプロファイルを作り直すわけではありません。
@@ -376,6 +423,8 @@ vitest v5.0.3 の `test/browser`（テスト・fixtures・specs）をこのパ�
 Vitest の結果はブラウザ内のテストファイルが完了してから Bun に登録します。実行中の skip とフックの失敗を確定してから報告し、実行対象がない suite 内でも todo は todo として扱います。
 
 ## backend ごとの互換性
+
+Firefox の対応範囲は [Firefox / Gecko](#firefox--gecko) を参照してください。
 
 結果を比較するときは `BWT_BACKEND=chrome` / `BWT_BACKEND=webkit` を明示してください。WKWebView は macOS のシステム WebKit を使い、Playwright WebKit とはビルドが異なります。以下は Bun 1.4.2 / macOS 26.6.2 / Chromium 145.0.7632.6 で確認した内容です。エンジンの更新で挙動は変わることがあります。
 

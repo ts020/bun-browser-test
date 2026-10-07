@@ -14,7 +14,7 @@ export interface Boot {
   platform: string;
   version: string;
   provider: string;
-  backend: "chrome" | "webkit";
+  backend: "chrome" | "webkit" | "firefox";
   commands: string[];
   testFile: ModuleEntry;
   setupFiles: ModuleEntry[];
